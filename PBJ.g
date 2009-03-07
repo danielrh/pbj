@@ -1,5 +1,10 @@
 grammar PBJ;
 
+options
+{
+    language = C;
+}
+
 protocol
 	:	message*
 	;
@@ -25,8 +30,8 @@ flags_def
 	:	FLAGS IDENTIFIER BLOCK_OPEN BLOCK_CLOSE
 	;
 
-field 	:	OPTIONAL (typename|IDENTIFIER) IDENTIFIER EQUALS INT default_value? ITEM_TERMINATOR
-	|	(REQUIRED|REPEATED) (typename|IDENTIFIER) IDENTIFIER EQUALS INT ITEM_TERMINATOR
+field 	:	OPTIONAL (type|IDENTIFIER) IDENTIFIER EQUALS INT default_value? ITEM_TERMINATOR
+	|	(REQUIRED|REPEATED) (type|IDENTIFIER) IDENTIFIER EQUALS INT ITEM_TERMINATOR
 	;
 
 array_spec
@@ -37,7 +42,7 @@ default_value
 	:	SQBRACKET_OPEN DEFAULT EQUALS literal_value SQBRACKET_CLOSE
 	;
 
-typename:	UINT8
+type:	UINT8
 	|	INT8
 	|	SINT8
 	|	FIXED8
@@ -124,6 +129,6 @@ IDENTIFIER : ('a'..'z' |'A'..'Z' |'_' ) ('a'..'z' |'A'..'Z' |'_' |'0'..'9' )* ;
 
 INT      : '0'..'9'+ ;
 
-COMMENT	: '//' .* '\n' {skip();} ;
+COMMENT	: '//' .* '\n' {$channel=HIDDEN;} ;
 
-WS       : (' '|'\t'|'\n'|'\r')+ {skip();} ;
+WS       : (' '|'\t'|'\n'|'\r')+ {$channel=HIDDEN;} ;
