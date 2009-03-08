@@ -5,11 +5,33 @@ options
     language = C;
 }
 
+scope Symbols {
+    pANTLR3_HASH_TABLE types;
+    pANTLR3_HASH_TABLE enum_values;
+}
+
+@members {
+    #include "PBJParseUtil.h"
+}
+
+
 protocol
+    scope Symbols;
+    @init {
+        initSymbolTable(SCOPE_TOP(Symbols));
+    }
 	:	message*
 	;
 
-message :	MESSAGE IDENTIFIER BLOCK_OPEN message_element* BLOCK_CLOSE
+message
+    scope Symbols;
+    @init {
+        initSymbolTable(SCOPE_TOP(Symbols));
+    }
+    :   MESSAGE IDENTIFIER BLOCK_OPEN message_element* BLOCK_CLOSE
+        {
+            defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+        }
 	;
 
 message_element
@@ -20,14 +42,23 @@ message_element
 
 enum_def
 	:	ENUM IDENTIFIER BLOCK_OPEN enum_element+ BLOCK_CLOSE
+        {
+            defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+        }
 	;
 
 enum_element
 	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
+        {
+            defineEnumValue( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+        }
 	;
 
 flags_def
 	:	FLAGS IDENTIFIER BLOCK_OPEN BLOCK_CLOSE
+        {
+            defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+        }
 	;
 
 field
