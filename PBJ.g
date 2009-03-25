@@ -141,9 +141,48 @@ flag_element
 	;
 
 field
-    :   OPTIONAL (type|IDENTIFIER) IDENTIFIER EQUALS integer default_value? ITEM_TERMINATOR
-	|	(REQUIRED|REPEATED) (type|IDENTIFIER) IDENTIFIER EQUALS integer ITEM_TERMINATOR
+    scope{
+        pANTLR3_STRING fieldType;
+        pANTLR3_STRING fieldName;
+        int fieldOffset;
+    }
+    :   ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) )
+    {
+        printf ("Field name: \%s \%s=\%d\n",$field::fieldType->chars,$field::fieldName->chars,$field::fieldOffset);
+        stringFree($field::fieldName);
+        stringFree($field::fieldType);
+    }
 	;
+
+field_offset
+    : integer
+    {
+        
+        $field::fieldOffset=atoi($integer.text->chars);
+    }
+    ;
+
+field_name
+    : IDENTIFIER
+    {
+        $field::fieldName=stringDup($IDENTIFIER.text);
+    }
+    ;
+
+field_type
+    : type
+    {
+        $field::fieldType=stringDup($type.text);
+    }
+    | advanced_type
+    {
+       $field::fieldType=stringDup($advanced_type.text);
+    }
+    | IDENTIFIER
+    {
+       $field::fieldType=stringDup($IDENTIFIER.text);
+    }
+    ;
 
 array_spec
 	:	SQBRACKET_OPEN integer? SQBRACKET_CLOSE
@@ -176,8 +215,27 @@ type:	UINT8
 	|	FLOAT
 	|	DOUBLE
 	|	BOOL
-	|	FLAGS
+
 	;
+advanced_type:	BYTE
+	|	FLAGS
+    |   UUID
+    |   NORMAL3F
+    |   VECTOR2F
+    |   VECTOR2D
+    |   VECTOR3F
+    |   VECTOR3D
+    |   VECTOR4F
+    |   VECTOR4D
+    |   QUATERNION
+    |   ANGLE
+    |   TIME
+    |   DURATION
+    |   BOUNDINGSPHERE3F
+    |   BOUNDINGSPHERE3D
+    |   BOUNDINGBOX3F3F
+    |   BOUNDINGBOX3D3F
+    ; 
 
 literal_value
 	:	HEX_LITERAL
@@ -243,6 +301,26 @@ SFIXED64:	'sfixed64';
 FLOAT	:	'float';
 DOUBLE	:	'double';
 BOOL	:	'bool';
+
+// Advanced Type Elements
+BYTE : 'byte';
+UUID : 'uuid';
+NORMAL3F : 'normal3f';
+VECTOR2F : 'vector2f';
+VECTOR2D : 'vector2d';
+VECTOR3F : 'vector3f';
+VECTOR3D : 'vector3d';
+VECTOR4F : 'vector4f';
+VECTOR4D : 'vector4d';
+QUATERNION : 'quaternion';
+ANGLE : 'angle';
+TIME : 'time';
+DURATION : 'duration';
+BOUNDINGSPHERE3F : 'boundingsphere3f';
+BOUNDINGSPHERE3D : 'boundingsphere3d';
+BOUNDINGBOX3F3F : 'boundingbox3f3f';
+BOUNDINGBOX3D3F : 'boundingbox3d3f';
+
 
 SQBRACKET_OPEN	:	'[';
 SQBRACKET_CLOSE	:	']';
