@@ -5,8 +5,12 @@ options
     language = C;
 }
 
-scope Symbols {
+scope NameSpace {
     pANTLR3_STRING package;
+    pANTLR3_LIST imports;
+}
+
+scope Symbols {
     pANTLR3_HASH_TABLE types;
     pANTLR3_HASH_TABLE enum_values;
 }
@@ -17,64 +21,122 @@ scope Symbols {
 
 
 protocol
+    scope NameSpace;
+    @init {
+        initNameSpace(SCOPE_TOP(NameSpace));
+    }
+	:	importrule* (package importrule*)? messages
+	;
+
+messages 
     scope Symbols;
     @init {
         initSymbolTable(SCOPE_TOP(Symbols));
     }
-	:	package? message*
-	;
-
+    : message*
+    ;
 package
-    scope Symbols;
    :   PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR
         {
-            initPackage( SCOPE_TOP(Symbols), $QUALIFIEDIDENTIFIER.text );
+            initPackage( SCOPE_TOP(NameSpace), $QUALIFIEDIDENTIFIER.text );
+        }
+	;
+
+importrule
+   :   IMPORTLITERAL STRING_LITERAL ITEM_TERMINATOR
+        {
+            initImport( SCOPE_TOP(NameSpace), $STRING_LITERAL.text );
         }
 	;
 
 
 message
-    scope Symbols;
-    @init {
-        initSymbolTable(SCOPE_TOP(Symbols));
+    scope {
+        pANTLR3_STRING messageName;
     }
-    :   MESSAGE IDENTIFIER BLOCK_OPEN message_element* BLOCK_CLOSE
+    scope Symbols;
+    @init
+    {
+        initSymbolTable(SCOPE_TOP(Symbols));  
+    }
+    :   MESSAGE message_identifier BLOCK_OPEN message_element* BLOCK_CLOSE
         {
-            defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+            defineType( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName );
+            stringFree($message::messageName);
         }
 	;
 
+message_identifier
+    : IDENTIFIER
+    {
+        $message::messageName=stringDup($IDENTIFIER.text);
+    }
+    ;
 message_element
 	:	field
 	|	message
 	|	enum_def
+	|	flags_def
 	;
 
 enum_def
-	:	ENUM IDENTIFIER BLOCK_OPEN enum_element+ BLOCK_CLOSE
+    scope {
+        pANTLR3_STRING enumName;
+        pANTLR3_LIST enumList;
+    }
+    @init {
+        $enum_def::enumList=antlr3ListNew(1);
+    }
+	:	ENUM enum_identifier BLOCK_OPEN enum_element+ BLOCK_CLOSE
         {
-            defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+            defineEnum( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $enum_def::enumName, $enum_def::enumList);
+            $enum_def::enumList->free($enum_def::enumList);
+            stringFree($enum_def::enumName);
         }
 	;
 
 enum_element
 	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
         {
-            defineEnumValue( SCOPE_TOP(Symbols), $IDENTIFIER.text, $integer.text );
+            defineEnumValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $enum_def::enumName, $enum_def::enumList, $IDENTIFIER.text, $integer.text );
+        }
+	;
+enum_identifier
+    : IDENTIFIER
+      {
+            $enum_def::enumName=stringDup($IDENTIFIER.text);
+      }
+      ;
+
+flags_def
+    scope
+    {
+        pANTLR3_STRING flagName;
+        pANTLR3_LIST flagList;
+    }
+    @init {
+        $flags_def::flagList=antlr3ListNew(1);
+        
+    }
+	:	FLAGS flag_identifier BLOCK_OPEN flag_element+ BLOCK_CLOSE
+        {
+            defineFlag( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $flags_def::flagName, $flags_def::flagList);
+            $flags_def::flagList->free($flags_def::flagList);
+            stringFree($flags_def::flagName);
         }
 	;
 
-flags_def
-	:	FLAGS IDENTIFIER BLOCK_OPEN flag_element+ BLOCK_CLOSE
+flag_identifier 
+	:	IDENTIFIER
         {
-            defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+            $flags_def::flagName=stringDup($IDENTIFIER.text);
         }
 	;
 
 flag_element
 	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
         {
-            defineFlagValue( SCOPE_TOP(Symbols), $IDENTIFIER.text , $integer.text);
+            defineFlagValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $flags_def::flagName, $flags_def::flagList, $IDENTIFIER.text , $integer.text);
         }
 	;
 
@@ -127,6 +189,7 @@ literal_value
     ;
 
 PACKAGELITERAL :    'package';
+IMPORTLITERAL :     'import';
 
 DOT :  '.';
 
@@ -242,6 +305,7 @@ UnicodeEscape
 
 
 IDENTIFIER : ('a'..'z' |'A'..'Z' |'_' ) ('a'..'z' |'A'..'Z' |'_' |'0'..'9' )* ;
+
 
 QUALIFIEDIDENTIFIER : ('a'..'z' |'A'..'Z' |'_' ) ('a'..'z' |'A'..'Z' |'_' | '.' |'0'..'9' )* ;
 
