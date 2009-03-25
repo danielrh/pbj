@@ -12,8 +12,10 @@
 
 void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab);
 void initSymbolTable(SCOPE_TYPE(Symbols) symtab);
+void initPackage(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id);
 void defineType(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id);
-void defineEnumValue(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id);
+void defineEnumValue(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id,  pANTLR3_STRING value);
+void defineFlagValue(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id,  pANTLR3_STRING value);
 ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name);
 
 #endif //_PBJ_PARSE_UTIL_H_

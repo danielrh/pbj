@@ -7,9 +7,15 @@ void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
 }
 
 void initSymbolTable(SCOPE_TYPE(Symbols) symtab) {
+    symtab->package=NULL;
     symtab->types = antlr3HashTableNew(11);
     symtab->enum_values = antlr3HashTableNew(11);
     symtab->free = freeSymbolTable;
+}
+
+void initPackage(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id) {
+    symtab->package=id->factory->newRaw(id->factory);
+    symtab->package->appendS(symtab->package,id);
 }
 
 void defineType(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id) {
@@ -18,8 +24,14 @@ void defineType(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id) {
     //printf("define type \%s\n", id->chars);
 }
 
-void defineEnumValue(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id) {
+void defineEnumValue(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_STRING value) {
     if (symtab == NULL) return;
+    symtab->enum_values->put(symtab->enum_values, id->chars, id, NULL);
+    //printf("define enum value \%s\n", id->chars);
+}
+
+void defineFlagValue(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_STRING value) {
+    if (symtab == NULL) return;//FIXME
     symtab->enum_values->put(symtab->enum_values, id->chars, id, NULL);
     //printf("define enum value \%s\n", id->chars);
 }

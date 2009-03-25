@@ -6,6 +6,7 @@ options
 }
 
 scope Symbols {
+    pANTLR3_STRING package;
     pANTLR3_HASH_TABLE types;
     pANTLR3_HASH_TABLE enum_values;
 }
@@ -20,8 +21,17 @@ protocol
     @init {
         initSymbolTable(SCOPE_TOP(Symbols));
     }
-	:	message*
+	:	package? message*
 	;
+
+package
+    scope Symbols;
+   :   PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR
+        {
+            initPackage( SCOPE_TOP(Symbols), $QUALIFIEDIDENTIFIER.text );
+        }
+	;
+
 
 message
     scope Symbols;
@@ -50,14 +60,21 @@ enum_def
 enum_element
 	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
         {
-            defineEnumValue( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+            defineEnumValue( SCOPE_TOP(Symbols), $IDENTIFIER.text, $integer.text );
         }
 	;
 
 flags_def
-	:	FLAGS IDENTIFIER BLOCK_OPEN BLOCK_CLOSE
+	:	FLAGS IDENTIFIER BLOCK_OPEN flag_element+ BLOCK_CLOSE
         {
             defineType( SCOPE_TOP(Symbols), $IDENTIFIER.text );
+        }
+	;
+
+flag_element
+	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
+        {
+            defineFlagValue( SCOPE_TOP(Symbols), $IDENTIFIER.text , $integer.text);
         }
 	;
 
@@ -108,6 +125,10 @@ literal_value
     |   BOOL_LITERAL
     |   STRING_LITERAL
     ;
+
+PACKAGELITERAL :    'package';
+
+DOT :  '.';
 
 // Message elements
 MESSAGE	:	'message';
@@ -222,6 +243,7 @@ UnicodeEscape
 
 IDENTIFIER : ('a'..'z' |'A'..'Z' |'_' ) ('a'..'z' |'A'..'Z' |'_' |'0'..'9' )* ;
 
+QUALIFIEDIDENTIFIER : ('a'..'z' |'A'..'Z' |'_' ) ('a'..'z' |'A'..'Z' |'_' | '.' |'0'..'9' )* ;
 
 COMMENT	: '//' .* '\n' {$channel=HIDDEN;}
         | '/*' ( options {greedy=false;} : . )* '*/' {$channel=HIDDEN;}
