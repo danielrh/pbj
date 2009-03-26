@@ -2,7 +2,14 @@ grammar PBJ;
 
 options
 {
+    output = AST;
     language = C;
+    ASTLabelType = pANTLR3_BASE_TREE;
+}
+
+tokens
+{
+    PROTO;
 }
 
 scope NameSpace {
@@ -18,23 +25,22 @@ scope Symbols {
 @members {
     #include "PBJParseUtil.h"
 }
-
-
 protocol
-    scope NameSpace;
-    @init {
-        initNameSpace(SCOPE_TOP(NameSpace));
-    }
-	:	importrule* (package importrule*)? messages
-	;
-
-messages 
     scope Symbols;
     @init {
         initSymbolTable(SCOPE_TOP(Symbols));
     }
-    : message*
+    : protoroot ->protoroot
     ;
+
+protoroot
+    scope NameSpace;
+    @init {
+        initNameSpace(SCOPE_TOP(NameSpace));
+    }
+	:	importrule* (package importrule*)? message*
+	;
+
 package
    :   PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR
         {
@@ -54,12 +60,7 @@ message
     scope {
         pANTLR3_STRING messageName;
     }
-    scope Symbols;
-    @init
-    {
-        initSymbolTable(SCOPE_TOP(Symbols));  
-    }
-    :   MESSAGE message_identifier BLOCK_OPEN message_element* BLOCK_CLOSE
+    :   MESSAGE message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE
         {
             defineType( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName );
             stringFree($message::messageName);
@@ -72,6 +73,19 @@ message_identifier
         $message::messageName=stringDup($IDENTIFIER.text);
     }
     ;
+
+message_elements
+    scope Symbols;
+    @init
+    {
+        initSymbolTable(SCOPE_TOP(Symbols));  
+    }
+	:	message_element*
+    {
+
+    }
+    ;
+
 message_element
 	:	field
 	|	message
@@ -146,9 +160,11 @@ field
         pANTLR3_STRING fieldName;
         int fieldOffset;
     }
-    :   ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) )
+    :   ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> REPEATED["repeated"] multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR 
+     |
+      ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) )
     {
-        printf ("Field name: \%s \%s=\%d\n",$field::fieldType->chars,$field::fieldName->chars,$field::fieldOffset);
+        //printf ("Field name: \%s \%s=\%d\n",$field::fieldType->chars,$field::fieldName->chars,$field::fieldOffset);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
     }
@@ -181,6 +197,13 @@ field_type
     | IDENTIFIER
     {
        $field::fieldType=stringDup($IDENTIFIER.text);
+    }
+    ;
+multiplicitive_type
+    : 
+    multiplicitive_advanced_type 
+    {
+       $field::fieldType=stringDup($multiplicitive_advanced_type.text);        
     }
     ;
 
@@ -217,26 +240,30 @@ type:	UINT8
 	|	BOOL
 
 	;
-advanced_type:	BYTE
-	|	FLAGS
-    |   UUID
-    |   NORMAL3F
-    |   VECTOR2F
-    |   VECTOR2D
-    |   VECTOR3F
-    |   VECTOR3D
-    |   VECTOR4F
-    |   VECTOR4D
-    |   QUATERNION
-    |   ANGLE
-    |   TIME
-    |   DURATION
-    |   BOUNDINGSPHERE3F
-    |   BOUNDINGSPHERE3D
-    |   BOUNDINGBOX3F3F
+multiplicitive_advanced_type:
+    |   NORMAL3F -> FLOAT["float"]
+    |   VECTOR2F -> FLOAT["float"]
+    |   VECTOR2D -> DOUBLE["double"]
+    |   VECTOR3F -> FLOAT["float"]
+    |   VECTOR3D -> DOUBLE["double"]
+    |   VECTOR4F -> FLOAT["float"]
+    |   VECTOR4D -> DOUBLE["double"]
+    |   QUATERNION -> FLOAT["float"]
+    |   BOUNDINGSPHERE3F -> FLOAT["float"]
+    |   BOUNDINGSPHERE3D -> DOUBLE["double"]
+    |   BOUNDINGBOX3F3F -> FLOAT["float"]
+    ;
+
+advanced_type:	BYTE -> BYTES["bytes"]
+	|	FLAGS -> ENUM["enum"]
+    |   UUID -> BYTES["bytes"]
+    |   ANGLE -> FLOAT["float"]
+    |   TIME -> FIXED64["fixed64"]
+    |   DURATION -> SFIXED64["sfixed64"]
     |   BOUNDINGBOX3D3F
     ; 
-
+bookey : BOOKEY_LITERAL ;
+BOOKEY_LITERAL :    'bookey';
 literal_value
 	:	HEX_LITERAL
     |   DECIMAL_LITERAL
@@ -301,6 +328,8 @@ SFIXED64:	'sfixed64';
 FLOAT	:	'float';
 DOUBLE	:	'double';
 BOOL	:	'bool';
+BYTES   :   'bytes';
+STRING   :   'string';
 
 // Advanced Type Elements
 BYTE : 'byte';

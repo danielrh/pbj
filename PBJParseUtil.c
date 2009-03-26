@@ -81,3 +81,62 @@ ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name) {
     }
     return ANTLR3_FALSE;
 }
+
+void grammarToString	(pANTLR3_TREE_NODE_STREAM tns, pANTLR3_BASE_TREE p, pANTLR3_BASE_TREE stop, pANTLR3_STRING buf)
+{
+
+	ANTLR3_UINT32   n;
+	ANTLR3_UINT32   c;
+
+	if	(!p->isNilNode(p) )
+	{
+		pANTLR3_STRING	text;
+
+		text	= p->toString(p);
+        if (text == NULL) {
+            pANTLR3_COMMON_TOKEN tok=((pANTLR3_COMMON_TREE)(p->super))->token;
+            if (tok->strFactory==NULL) {
+                tok->strFactory=buf->factory;
+                text = tok->getText(((pANTLR3_COMMON_TREE)(p->super))->token);
+            }
+        }
+
+		if  (text == NULL)
+		{
+			text = tns->ctns->stringFactory->newRaw(tns->ctns->stringFactory);
+
+			text->addc	(text, ' ');
+			text->addi	(text, p->getType(p));
+		}
+
+		buf->appendS(buf, text);
+	}
+
+	if	(p == stop)
+	{
+		return;		/* Finished */
+	}
+
+	n = p->getChildCount(p);
+
+	if	(n > 0 && ! p->isNilNode(p) )
+	{
+		buf->addc   (buf, ' ');
+		buf->addi   (buf, ANTLR3_TOKEN_DOWN);
+	}
+
+	for	(c = 0; c<n ; c++)
+	{
+		pANTLR3_BASE_TREE   child;
+
+		child = (pANTLR3_BASE_TREE)p->getChild(p, c);
+		grammarToString(tns, child, stop, buf);
+	}
+
+	if	(n > 0 && ! p->isNilNode(p) )
+	{
+		buf->addc   (buf, ' ');
+		buf->addi   (buf, ANTLR3_TOKEN_UP);
+	}
+}
+

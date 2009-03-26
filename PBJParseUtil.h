@@ -21,6 +21,7 @@ void defineFlagValue(SCOPE_TYPE(NameSpace), SCOPE_TYPE(Symbols) symtab, pANTLR3_
 void defineEnum(SCOPE_TYPE(NameSpace), SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_LIST enumList);
 void defineFlag(SCOPE_TYPE(NameSpace), SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_LIST flagLis);
 void stringFree(void *s);
+void grammarToString(pANTLR3_TREE_NODE_STREAM node_stream, pANTLR3_BASE_TREE base, pANTLR3_BASE_TREE stop, pANTLR3_STRING bufOutput);
 pANTLR3_STRING stringDup(pANTLR3_STRING s);
 ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name);
 

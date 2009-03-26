@@ -1,5 +1,7 @@
 #include "PBJ.h"
-
+extern "C" {
+#include "PBJParseUtil.h"
+}
 int main(int argc, char *argv[])
 {
     pANTLR3_UINT8 filename;
@@ -7,7 +9,7 @@ int main(int argc, char *argv[])
     pPBJLexer lxr;
     pANTLR3_COMMON_TOKEN_STREAM tstream;
     pPBJParser psr;
-
+    PBJParser_protocol_return     pbjAST;
     if (argc < 2 || argv[1] == NULL)
         filename = (pANTLR3_UINT8)"./input";
     else
@@ -37,8 +39,22 @@ int main(int argc, char *argv[])
 	exit(ANTLR3_ERR_NOMEM);
     }
 
-    psr->protocol(psr);
-
+    pbjAST=psr->protocol(psr);
+    if (psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec) > 0)
+    {
+        ANTLR3_FPRINTF(stderr, "The parser returned \%d errors, tree walking aborted.\n", psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec));
+ 
+    }
+    else
+    {
+        pANTLR3_COMMON_TREE_NODE_STREAM    nodes;
+        nodes   = antlr3CommonTreeNodeStreamNewTree(pbjAST.tree, ANTLR3_SIZE_HINT); // sIZE HINT WILL SOON BE DEPRECATED!!
+        pANTLR3_STRING s = nodes->stringFactory->newRaw(nodes->stringFactory);
+        grammarToString(nodes->tnstream,nodes->root,NULL,s);
+        printf("%s",s->chars);
+        stringFree(s);
+        nodes   ->free  (nodes);        nodes   = NULL;
+    }
     psr->free(psr);
     psr = NULL;
 
