@@ -42,14 +42,14 @@ protoroot
 	;
 
 package
-   :   PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR
+   :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER ITEM_TERMINATOR WS["\n"])
         {
             initPackage( SCOPE_TOP(NameSpace), $QUALIFIEDIDENTIFIER.text );
         }
 	;
 
 importrule
-   :   IMPORTLITERAL STRING_LITERAL ITEM_TERMINATOR
+   :   ( IMPORTLITERAL STRING_LITERAL ITEM_TERMINATOR -> IMPORTLITERAL WS[" "] STRING_LITERAL ITEM_TERMINATOR WS["\n"] )
         {
             initImport( SCOPE_TOP(NameSpace), $STRING_LITERAL.text );
         }
@@ -60,7 +60,7 @@ message
     scope {
         pANTLR3_STRING messageName;
     }
-    :   MESSAGE message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE
+    :   ( MESSAGE message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE -> MESSAGE WS[" "] message_identifier WS[" "] BLOCK_OPEN WS["\n"] message_elements BLOCK_CLOSE WS["\n"] )
         {
             defineType( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName );
             stringFree($message::messageName);
@@ -101,7 +101,7 @@ enum_def
     @init {
         $enum_def::enumList=antlr3ListNew(1);
     }
-	:	ENUM enum_identifier BLOCK_OPEN enum_element+ BLOCK_CLOSE
+	:	( ENUM enum_identifier BLOCK_OPEN enum_element+ BLOCK_CLOSE -> WS["\t"] ENUM WS[" "] enum_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] enum_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
         {
             defineEnum( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $enum_def::enumName, $enum_def::enumList);
             $enum_def::enumList->free($enum_def::enumList);
@@ -110,7 +110,7 @@ enum_def
 	;
 
 enum_element
-	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
+	:	(IDENTIFIER EQUALS integer ITEM_TERMINATOR -> WS["\t"] IDENTIFIER WS[" "] EQUALS WS[" "] integer ITEM_TERMINATOR WS["\n"] )
         {
             defineEnumValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $enum_def::enumName, $enum_def::enumList, $IDENTIFIER.text, $integer.text );
         }
@@ -132,7 +132,7 @@ flags_def
         $flags_def::flagList=antlr3ListNew(1);
         
     }
-	:	FLAGS flag_identifier BLOCK_OPEN flag_element+ BLOCK_CLOSE
+	:	( FLAGS flag_identifier BLOCK_OPEN flag_element+ BLOCK_CLOSE -> WS["\t"] ENUM["enum"] WS[" "] flag_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] flag_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
         {
             defineFlag( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $flags_def::flagName, $flags_def::flagList);
             $flags_def::flagList->free($flags_def::flagList);
@@ -148,7 +148,7 @@ flag_identifier
 	;
 
 flag_element
-	:	IDENTIFIER EQUALS integer ITEM_TERMINATOR
+	:	( IDENTIFIER EQUALS integer ITEM_TERMINATOR -> WS["\t"] IDENTIFIER WS[" "] EQUALS WS[" "] integer ITEM_TERMINATOR WS["\n"])
         {
             defineFlagValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $flags_def::flagName, $flags_def::flagList, $IDENTIFIER.text , $integer.text);
         }
@@ -160,9 +160,11 @@ field
         pANTLR3_STRING fieldName;
         int fieldOffset;
     }
-    :   ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> REPEATED["repeated"] multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR 
+    :  (( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] ITEM_TERMINATOR WS["\n"] )
      |
-      ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) )
+            ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] OPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
+     | 
+            ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
     {
         //printf ("Field name: \%s \%s=\%d\n",$field::fieldType->chars,$field::fieldName->chars,$field::fieldOffset);
         stringFree($field::fieldName);
@@ -241,7 +243,7 @@ type:	UINT8
 
 	;
 multiplicitive_advanced_type:
-    |   NORMAL3F -> FLOAT["float"]
+    |   NORMAL -> FLOAT["float"]
     |   VECTOR2F -> FLOAT["float"]
     |   VECTOR2D -> DOUBLE["double"]
     |   VECTOR3F -> FLOAT["float"]
@@ -262,8 +264,7 @@ advanced_type:	BYTE -> BYTES["bytes"]
     |   DURATION -> SFIXED64["sfixed64"]
     |   BOUNDINGBOX3D3F
     ; 
-bookey : BOOKEY_LITERAL ;
-BOOKEY_LITERAL :    'bookey';
+
 literal_value
 	:	HEX_LITERAL
     |   DECIMAL_LITERAL
@@ -334,7 +335,7 @@ STRING   :   'string';
 // Advanced Type Elements
 BYTE : 'byte';
 UUID : 'uuid';
-NORMAL3F : 'normal3f';
+NORMAL : 'normal';
 VECTOR2F : 'vector2f';
 VECTOR2D : 'vector2d';
 VECTOR3F : 'vector3f';

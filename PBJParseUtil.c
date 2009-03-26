@@ -40,29 +40,29 @@ void initImport(SCOPE_TYPE(NameSpace) symtab, pANTLR3_STRING filename) {
 void defineType(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id) {
     if (symtab == NULL) return;
     symtab->types->put(symtab->types, id->chars, id, NULL);
-    printf("define type \%s\n", id->chars);
+    fprintf(stderr,"define type \%s\n", id->chars);
 }
 
 void defineEnum(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
     if (symtab == NULL) return;
     defineType(ns, symtab,id);
-    printf("define enum value \%s\n", id->chars);
+    fprintf(stderr,"define enum value \%s\n", id->chars);
 }
 void defineEnumValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
     if (symtab == NULL) return;
     symtab->enum_values->put(symtab->enum_values, id->chars, id, NULL);
-    printf("define enum value \%s::\%s=\%s\n", enumName->chars,id->chars,value->chars);
+    fprintf(stderr,"define enum value \%s::\%s=\%s\n", enumName->chars,id->chars,value->chars);
 }
 void defineFlag(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_LIST flagValues) {
     if (symtab == NULL) return;
     defineType(ns, symtab, id);
-    printf("define flag value \%s\n", id->chars);
+    fprintf(stderr,"define flag value \%s\n", id->chars);
 }
 
 void defineFlagValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
     if (symtab == NULL) return;//FIXME
     symtab->enum_values->put(symtab->enum_values, id->chars, id, NULL);
-    printf("define flag value \%s::\%s::\%s=\%s\n", ns->package->chars, flagName->chars,id->chars,value->chars);
+    fprintf(stderr,"define flag value \%s::\%s::\%s=\%s\n", ns->package->chars, flagName->chars,id->chars,value->chars);
 }
 
 ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name) {
