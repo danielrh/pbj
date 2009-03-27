@@ -59,14 +59,23 @@ importrule
 
 message
     scope {
+        int isExtension;
         pANTLR3_STRING messageName;
     }
-    :   ( MESSAGE message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE -> MESSAGE WS[" "] message_identifier WS[" "] BLOCK_OPEN WS["\n"] message_elements BLOCK_CLOSE WS["\n"] )
+    :   ( message_or_extend message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE -> message_or_extend WS[" "] message_identifier WS[" "] BLOCK_OPEN WS["\n"] message_elements BLOCK_CLOSE WS["\n"] )
         {
-            defineType( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName );
+            if(!$message::isExtension) {
+                defineType( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName );
+            }
             stringFree($message::messageName);
         }
 	;
+
+message_or_extend : 
+        MESSAGE {$message::isExtension=0;}
+        |
+        EXTEND {$message::isExtension=1;}
+        ;
 
 message_identifier
     : IDENTIFIER
@@ -92,7 +101,12 @@ message_element
 	|	message
 	|	enum_def
 	|	flags_def
+    |   extensions
 	;
+
+extensions : EXTENSIONS integer TO integer_inclusive ITEM_TERMINATOR -> WS["\t"] EXTENSIONS WS[" "] integer WS[" "] TO WS[" "] integer_inclusive ITEM_TERMINATOR WS["\n"] ;
+
+integer_inclusive : integer ;
 
 enum_def
     scope {
@@ -162,7 +176,7 @@ field
         pANTLR3_STRING fieldName;
         int fieldOffset;
     }
-    :  (( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] ITEM_TERMINATOR WS["\n"] )
+    :  (( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
      |
             ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] OPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
      | 
@@ -199,7 +213,10 @@ field_type
     }
     | ( IDENTIFIER 
         -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
-            && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)==32}?
+            && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)<28}?
+              FIXED32["uint32"] 
+        -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
+            && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)<=32}?
               FIXED32["fixed32"] 
         -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
             && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)==64}?
@@ -225,17 +242,7 @@ default_value
 	:	SQBRACKET_OPEN DEFAULT EQUALS literal_value SQBRACKET_CLOSE
 	;
 
-type:	UINT8
-	|	INT8
-	|	SINT8
-	|	FIXED8
-	|	SFIXED8
-	|	UINT16
-	|	INT16
-	|	SINT16
-	|	FIXED16
-	|	SFIXED16
-	|	UINT32
+type:		UINT32
 	|	INT32
 	|	SINT32
 	|	FIXED32
@@ -247,6 +254,8 @@ type:	UINT8
 	|	SFIXED64
 	|	FLOAT
 	|	DOUBLE
+	|	STRING
+	|	BYTES
 	|	BOOL
 
 	;
@@ -262,14 +271,23 @@ multiplicitive_advanced_type:
     |   BOUNDINGSPHERE3F -> FLOAT["float"]
     |   BOUNDINGSPHERE3D -> DOUBLE["double"]
     |   BOUNDINGBOX3F3F -> FLOAT["float"]
+    |   BOUNDINGBOX3D3F -> DOUBLE["double"]
     ;
 
-advanced_type:	BYTE -> BYTES["bytes"]
+advanced_type:	UINT8 -> UINT32["uint32"]
+	|	INT8 -> INT32["int32"]
+	|	SINT8 -> SINT32["sint32"]
+	|	FIXED8 -> INT32["uint32"]
+	|	SFIXED8 -> INT32["sint32"]
+	|	INT16 -> INT32["int32"]
+	|	SINT16 -> SINT32["sint32"]
+	|	FIXED16 -> INT32["uint32"]
+	|	SFIXED16 -> INT32["sint32"]
+    |   UINT16 -> UINT32["uint32"]
     |   UUID -> BYTES["bytes"]
     |   ANGLE -> FLOAT["float"]
     |   TIME -> FIXED64["fixed64"]
     |   DURATION -> SFIXED64["sfixed64"]
-    |   BOUNDINGBOX3D3F
     ; 
 
 literal_value
@@ -288,11 +306,23 @@ DOT :  '.';
 
 // Message elements
 MESSAGE	:	'message';
-
+EXTEND	:	'extend';
+EXTENSIONS : 'extensions';
+TO : 'to';
 // Enum elements
 ENUM	:	'enum';
 
 flags : 
+     FLAGS8
+     {
+        $flags_def::flagBits=8;
+     }
+     |
+     FLAGS16
+     {
+        $flags_def::flagBits=16;
+     }
+     |
      FLAGS32
      {
         $flags_def::flagBits=32;
@@ -305,6 +335,8 @@ flags :
 
      ;
 // Flags elements
+FLAGS8	:	'flags8';
+FLAGS16	:	'flags16';
 FLAGS32	:	'flags32';
 FLAGS64	:	'flags64';
 
