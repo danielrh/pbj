@@ -19,6 +19,7 @@ scope NameSpace {
 
 scope Symbols {
     pANTLR3_HASH_TABLE types;
+    pANTLR3_HASH_TABLE flag_sizes;
     pANTLR3_HASH_TABLE enum_values;
 }
 
@@ -103,7 +104,7 @@ enum_def
     }
 	:	( ENUM enum_identifier BLOCK_OPEN enum_element+ BLOCK_CLOSE -> WS["\t"] ENUM WS[" "] enum_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] enum_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
         {
-            defineEnum( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $enum_def::enumName, $enum_def::enumList);
+            defineEnum( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $enum_def::enumName, $enum_def::enumList);
             $enum_def::enumList->free($enum_def::enumList);
             stringFree($enum_def::enumName);
         }
@@ -112,7 +113,7 @@ enum_def
 enum_element
 	:	(IDENTIFIER EQUALS integer ITEM_TERMINATOR -> WS["\t"] IDENTIFIER WS[" "] EQUALS WS[" "] integer ITEM_TERMINATOR WS["\n"] )
         {
-            defineEnumValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $enum_def::enumName, $enum_def::enumList, $IDENTIFIER.text, $integer.text );
+            defineEnumValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $enum_def::enumName, $enum_def::enumList, $IDENTIFIER.text, $integer.text );
         }
 	;
 enum_identifier
@@ -127,14 +128,15 @@ flags_def
     {
         pANTLR3_STRING flagName;
         pANTLR3_LIST flagList;
+        int flagBits;
     }
     @init {
         $flags_def::flagList=antlr3ListNew(1);
         
     }
-	:	( FLAGS flag_identifier BLOCK_OPEN flag_element+ BLOCK_CLOSE -> WS["\t"] ENUM["enum"] WS[" "] flag_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] flag_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
+	:	( flags flag_identifier BLOCK_OPEN flag_element+ BLOCK_CLOSE -> WS["\t"] ENUM["enum"] WS[" "] flag_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] flag_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
         {
-            defineFlag( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $flags_def::flagName, $flags_def::flagList);
+            defineFlag( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $flags_def::flagName, $flags_def::flagList, $flags_def::flagBits);
             $flags_def::flagList->free($flags_def::flagList);
             stringFree($flags_def::flagName);
         }
@@ -150,7 +152,7 @@ flag_identifier
 flag_element
 	:	( IDENTIFIER EQUALS integer ITEM_TERMINATOR -> WS["\t"] IDENTIFIER WS[" "] EQUALS WS[" "] integer ITEM_TERMINATOR WS["\n"])
         {
-            defineFlagValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $flags_def::flagName, $flags_def::flagList, $IDENTIFIER.text , $integer.text);
+            defineFlagValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $flags_def::flagName, $flags_def::flagList, $IDENTIFIER.text , $integer.text);
         }
 	;
 
@@ -166,7 +168,6 @@ field
      | 
             ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
     {
-        //printf ("Field name: \%s \%s=\%d\n",$field::fieldType->chars,$field::fieldName->chars,$field::fieldOffset);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
     }
@@ -176,7 +177,7 @@ field_offset
     : integer
     {
         
-        $field::fieldOffset=atoi($integer.text->chars);
+        $field::fieldOffset=atoi((char*)($integer.text->chars));
     }
     ;
 
@@ -196,7 +197,14 @@ field_type
     {
        $field::fieldType=stringDup($advanced_type.text);
     }
-    | IDENTIFIER
+    | ( IDENTIFIER 
+        -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
+            && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)==32}?
+              FIXED32["fixed32"] 
+        -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
+            && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)==64}?
+             FIXED64["fixed64"] 
+        -> IDENTIFIER )
     {
        $field::fieldType=stringDup($IDENTIFIER.text);
     }
@@ -257,7 +265,6 @@ multiplicitive_advanced_type:
     ;
 
 advanced_type:	BYTE -> BYTES["bytes"]
-	|	FLAGS -> ENUM["enum"]
     |   UUID -> BYTES["bytes"]
     |   ANGLE -> FLOAT["float"]
     |   TIME -> FIXED64["fixed64"]
@@ -285,8 +292,21 @@ MESSAGE	:	'message';
 // Enum elements
 ENUM	:	'enum';
 
+flags : 
+     FLAGS32
+     {
+        $flags_def::flagBits=32;
+     }
+     |
+     FLAGS64
+     {
+        $flags_def::flagBits=64;
+     }
+
+     ;
 // Flags elements
-FLAGS	:	'flags';
+FLAGS32	:	'flags32';
+FLAGS64	:	'flags64';
 
 // Field elements
 REQUIRED:	'required';

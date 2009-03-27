@@ -11,6 +11,7 @@ void initNameSpace(SCOPE_TYPE(NameSpace) symtab) {
 }
 void initSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->types = antlr3HashTableNew(11);
+    symtab->flag_sizes = antlr3HashTableNew(11);
     symtab->enum_values = antlr3HashTableNew(11);
     symtab->free = freeSymbolTable;
 }
@@ -43,23 +44,27 @@ void defineType(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_ST
     fprintf(stderr,"define type \%s\n", id->chars);
 }
 
-void defineEnum(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
+void defineEnum(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
     if (symtab == NULL) return;
     defineType(ns, symtab,id);
     fprintf(stderr,"define enum value \%s\n", id->chars);
 }
-void defineEnumValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
+void defineEnumValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
     if (symtab == NULL) return;
     symtab->enum_values->put(symtab->enum_values, id->chars, id, NULL);
     fprintf(stderr,"define enum value \%s::\%s=\%s\n", enumName->chars,id->chars,value->chars);
 }
-void defineFlag(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id, pANTLR3_LIST flagValues) {
+void defineFlag(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST flagValues, unsigned int flagBits) {
+    unsigned int* bits=(unsigned int *)malloc(sizeof(unsigned int));
+    *bits=flagBits;
     if (symtab == NULL) return;
     defineType(ns, symtab, id);
+
+    symtab->flag_sizes->put(symtab->flag_sizes,id->chars,bits,NULL);
     fprintf(stderr,"define flag value \%s\n", id->chars);
 }
 
-void defineFlagValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
+void defineFlagValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
     if (symtab == NULL) return;//FIXME
     symtab->enum_values->put(symtab->enum_values, id->chars, id, NULL);
     fprintf(stderr,"define flag value \%s::\%s::\%s=\%s\n", ns->package->chars, flagName->chars,id->chars,value->chars);
