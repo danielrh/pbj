@@ -51,7 +51,14 @@ int main(int argc, char *argv[])
         nodes   = antlr3CommonTreeNodeStreamNewTree(pbjAST.tree, ANTLR3_SIZE_HINT); // sIZE HINT WILL SOON BE DEPRECATED!!
         pANTLR3_STRING s = nodes->stringFactory->newRaw(nodes->stringFactory);
         grammarToString(nodes->tnstream,nodes->root,NULL,s);
-        printf("%s",s->chars);
+        const char * outputFilename="output";
+        if (argc>=3) {
+            outputFilename=argv[2];
+        }
+        FILE*fp=fopen(outputFilename,"w");
+        if (s->size>1)
+            fwrite(s->chars,s->size-1,1,fp);
+        fclose(fp);
         stringFree(s);
         nodes   ->free  (nodes);        nodes   = NULL;
     }

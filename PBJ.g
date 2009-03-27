@@ -13,6 +13,7 @@ tokens
 }
 
 scope NameSpace {
+    struct LanguageOutputStruct* output;
     pANTLR3_STRING package;
     pANTLR3_LIST imports;
 }
@@ -20,6 +21,7 @@ scope NameSpace {
 scope Symbols {
     pANTLR3_HASH_TABLE types;
     pANTLR3_HASH_TABLE flag_sizes;
+    pANTLR3_HASH_TABLE flag_values;
     pANTLR3_HASH_TABLE enum_values;
 }
 
@@ -39,20 +41,21 @@ protoroot
     @init {
         initNameSpace(SCOPE_TOP(NameSpace));
     }
-	:	importrule* (package importrule*)? message*
+	:	importrule* package importrule* message*
+	|	(importrule* message* -> PACKAGELITERAL["package"] WS[" "] STRING_LITERAL["_PBJ_Internal"] ITEM_TERMINATOR[";"] WS["\n"] importrule* message*)
 	;
 
 package
-   :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER ITEM_TERMINATOR WS["\n"])
+   :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER QUALIFIEDIDENTIFIER["._PBJ_Internal"] ITEM_TERMINATOR WS["\n"])
         {
-            initPackage( SCOPE_TOP(NameSpace), $QUALIFIEDIDENTIFIER.text );
+            definePackage( SCOPE_TOP(NameSpace), $QUALIFIEDIDENTIFIER.text );
         }
 	;
 
 importrule
    :   ( IMPORTLITERAL STRING_LITERAL ITEM_TERMINATOR -> IMPORTLITERAL WS[" "] STRING_LITERAL ITEM_TERMINATOR WS["\n"] )
         {
-            initImport( SCOPE_TOP(NameSpace), $STRING_LITERAL.text );
+            defineImport( SCOPE_TOP(NameSpace), $STRING_LITERAL.text );
         }
 	;
 
@@ -174,16 +177,27 @@ field
     scope{
         pANTLR3_STRING fieldType;
         pANTLR3_STRING fieldName;
+        ///protobuf value if it is an advanced_type or default kind of type...  C++ value if it's a multiplicitve type
+        pANTLR3_STRING defaultValue;
         int fieldOffset;
     }
-    :  (( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
-     |
-            ( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] OPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
-     | 
-            ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
+    @init {$field::defaultValue=NULL;}
+    :  ( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
     {
+        defineField(SCOPE_TOP(NameSpace),SCOPE_TOP(Symbols),$field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,1);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
+        stringFree($field::defaultValue);
+    }
+     |
+     (( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] OPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
+      | 
+      ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
+    {
+        defineField(SCOPE_TOP(NameSpace),SCOPE_TOP(Symbols),$field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,0);
+        stringFree($field::fieldName);
+        stringFree($field::fieldType);
+        stringFree($field::defaultValue);
     }
 	;
 
@@ -240,6 +254,9 @@ array_spec
 
 default_value
 	:	SQBRACKET_OPEN DEFAULT EQUALS literal_value SQBRACKET_CLOSE
+    {
+        $field::defaultValue=defaultValuePreprocess(SCOPE_TOP(NameSpace),SCOPE_TOP(Symbols),$field::fieldType, $literal_value.text);
+    }
 	;
 
 type:		UINT32
