@@ -59,27 +59,6 @@ void defineType(pPBJParser ctx, pANTLR3_STRING id) {
     SCOPE_TOP(Symbols)->types->put(SCOPE_TOP(Symbols)->types, id->chars, id, NULL);
 }
 
-void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
-    if (SCOPE_TOP(Symbols) == NULL) return;
-    defineType(ctx,id);
-}
-void defineEnumValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
-    if (SCOPE_TOP(Symbols) == NULL) return;
-    SCOPE_TOP(Symbols)->enum_values->put(SCOPE_TOP(Symbols)->enum_values, id->chars, value, NULL);
-}
-void defineFlag(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST flagValues, unsigned int flagBits) {
-    unsigned int* bits=(unsigned int *)malloc(sizeof(unsigned int));
-    *bits=flagBits;
-    if (SCOPE_TOP(Symbols) == NULL) return;
-    defineType(ctx, id);
-
-    SCOPE_TOP(Symbols)->flag_sizes->put(SCOPE_TOP(Symbols)->flag_sizes,id->chars,bits,NULL);
-}
-
-void defineFlagValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
-    if (SCOPE_TOP(Symbols) == NULL) return;//FIXME
-    SCOPE_TOP(Symbols)->flag_values->put(SCOPE_TOP(Symbols)->enum_values, id->chars, id, NULL);
-}
 
 ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name) {
     int i;
@@ -189,10 +168,12 @@ static void closeNamespace(pPBJParser ctx) {
     if (SCOPE_TOP(NameSpace)->package) {
         size_t stringSize=SCOPE_TOP(NameSpace)->package->size;
         size_t i;
-        fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
-        for (i=0;i<stringSize;++i) {       
-            if (SCOPE_TOP(NameSpace)->package->chars[i]=='.') {
-                fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+        if (SCOPE_TOP(NameSpace)->output->cpp) {
+            fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+            for (i=0;i<stringSize;++i) {       
+                if (SCOPE_TOP(NameSpace)->package->chars[i]=='.') {
+                    fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+                }
             }
         }
     }
@@ -200,20 +181,94 @@ static void closeNamespace(pPBJParser ctx) {
 pANTLR3_STRING defaultValuePreprocess(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING value){
     return stringDup(value);
 }
+#define CPPFP SCOPE_TOP(NameSpace)->output->cpp 
+static void sendTabs(pPBJParser ctx,int offset) {
+    int num=SCOPE_SIZE(Symbols)+offset-1;
+    int i;
+    for (i=0;i<num;++i) {
+        fprintf(CPPFP,"    ");
+    }
+}
 void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
-    
+    if (CPPFP) {
+        sendTabs(ctx,1);
+        fprintf(CPPFP,"class %s : protected _PBJ_Internal::%s {\n",id->chars,id->chars);
+        sendTabs(ctx,1);
+        fprintf(CPPFP,"public:\n",id->chars,id->chars);
+    }
 }
 void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
+    if (CPPFP) {
+        sendTabs(ctx,1);
+        fprintf(CPPFP,"class %sExtend : public %s {\n",id->chars,id->chars);
+        sendTabs(ctx,1);
+        fprintf(CPPFP,"public:\n",id->chars,id->chars);
+    }
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int multiplicitive_advanced_type){
 }
+void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
+    int enumSize=enumValues->size(enumValues);
+    int i;
+    sendTabs(ctx,1);
+    fprintf(CPPFP,"enum %s {\n",id->chars);
+    for (i=0;i<enumSize;i+=2) {
+        pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
+        sendTabs(ctx,2);
+        fprintf(CPPFP,"%s=_PBJ_Internal::%s%s",
+                enumVal->chars,
+                enumVal->chars,
+                (i+2==enumSize?"\n":",\n"));            
+    }
+    sendTabs(ctx,1);
+    fprintf(CPPFP,"};\n");
+}
+void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    defineType(ctx,id);
+    if (CPPFP) {
+        printEnum(ctx,1,id,enumValues);
+    }
+        
+}
+void defineEnumValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    SCOPE_TOP(Symbols)->enum_values->put(SCOPE_TOP(Symbols)->enum_values, id->chars, value, NULL);
+    enumValues->put(enumValues,enumValues->size(enumValues),id,stringFree);
+    enumValues->put(enumValues,enumValues->size(enumValues),value,stringFree);
+}
+void defineFlag(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST flagValues, unsigned int flagBits) {
+    unsigned int* bits=(unsigned int *)malloc(sizeof(unsigned int));
+    *bits=flagBits;
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    defineType(ctx, id);
+    if (CPPFP) {
+        printEnum(ctx,1,id,flagValues);
+    }
+    SCOPE_TOP(Symbols)->flag_sizes->put(SCOPE_TOP(Symbols)->flag_sizes,id->chars,bits,NULL);
+}
+
+void defineFlagValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
+    if (SCOPE_TOP(Symbols) == NULL) return;//FIXME
+    SCOPE_TOP(Symbols)->flag_values->put(SCOPE_TOP(Symbols)->enum_values, id->chars, id, NULL);
+    flagValues->put(flagValues,flagValues->size(flagValues),id,stringFree);
+    flagValues->put(flagValues,flagValues->size(flagValues),value,stringFree);
+}
 void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
+    if (CPPFP) {
+        sendTabs(ctx,0);
+        fprintf(CPPFP,"};\n");
+    }
     closeNamespace(ctx);
 }
 
 void defineExtensionEnd(pPBJParser ctx, pANTLR3_STRING id){
+    if (CPPFP) {
+        sendTabs(ctx,0);
+        fprintf(CPPFP,"};\n");
+    }
     closeNamespace(ctx);
 }
     
