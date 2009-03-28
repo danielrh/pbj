@@ -48,14 +48,14 @@ protoroot
 package
    :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER QUALIFIEDIDENTIFIER["._PBJ_Internal"] ITEM_TERMINATOR WS["\n"])
         {
-            definePackage( SCOPE_TOP(NameSpace), $QUALIFIEDIDENTIFIER.text );
+            definePackage( ctx, $QUALIFIEDIDENTIFIER.text );
         }
 	;
 
 importrule
    :   ( IMPORTLITERAL STRING_LITERAL ITEM_TERMINATOR -> IMPORTLITERAL WS[" "] STRING_LITERAL ITEM_TERMINATOR WS["\n"] )
         {
-            defineImport( SCOPE_TOP(NameSpace), $STRING_LITERAL.text );
+            defineImport( ctx, $STRING_LITERAL.text );
         }
 	;
 
@@ -67,8 +67,11 @@ message
     }
     :   ( message_or_extend message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE -> message_or_extend WS[" "] message_identifier WS[" "] BLOCK_OPEN WS["\n"] message_elements BLOCK_CLOSE WS["\n"] )
         {
-            if(!$message::isExtension) {
-                defineType( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName );
+            if($message::isExtension) {
+                defineExtensionEnd(ctx, $message::messageName);
+            }else {
+                defineType( ctx, $message::messageName );
+                defineMessageEnd(ctx, $message::messageName);
             }
             stringFree($message::messageName);
         }
@@ -84,6 +87,11 @@ message_identifier
     : IDENTIFIER
     {
         $message::messageName=stringDup($IDENTIFIER.text);
+        if ($message::isExtension) {
+            defineExtension(ctx, $message::messageName);
+        }else {
+            defineMessage(ctx, $message::messageName);
+        }
     }
     ;
 
@@ -121,7 +129,7 @@ enum_def
     }
 	:	( ENUM enum_identifier BLOCK_OPEN enum_element+ BLOCK_CLOSE -> WS["\t"] ENUM WS[" "] enum_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] enum_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
         {
-            defineEnum( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $enum_def::enumName, $enum_def::enumList);
+            defineEnum( ctx, $message::messageName, $enum_def::enumName, $enum_def::enumList);
             $enum_def::enumList->free($enum_def::enumList);
             stringFree($enum_def::enumName);
         }
@@ -130,7 +138,7 @@ enum_def
 enum_element
 	:	(IDENTIFIER EQUALS integer ITEM_TERMINATOR -> WS["\t"] IDENTIFIER WS[" "] EQUALS WS[" "] integer ITEM_TERMINATOR WS["\n"] )
         {
-            defineEnumValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $enum_def::enumName, $enum_def::enumList, $IDENTIFIER.text, $integer.text );
+            defineEnumValue( ctx, $message::messageName, $enum_def::enumName, $enum_def::enumList, $IDENTIFIER.text, $integer.text );
         }
 	;
 enum_identifier
@@ -153,7 +161,7 @@ flags_def
     }
 	:	( flags flag_identifier BLOCK_OPEN flag_element+ BLOCK_CLOSE -> WS["\t"] ENUM["enum"] WS[" "] flag_identifier WS[" "] BLOCK_OPEN WS["\n"] (WS["\t"] flag_element)+ WS["\t"] BLOCK_CLOSE WS["\n"] )
         {
-            defineFlag( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $flags_def::flagName, $flags_def::flagList, $flags_def::flagBits);
+            defineFlag( ctx, $message::messageName, $flags_def::flagName, $flags_def::flagList, $flags_def::flagBits);
             $flags_def::flagList->free($flags_def::flagList);
             stringFree($flags_def::flagName);
         }
@@ -169,7 +177,7 @@ flag_identifier
 flag_element
 	:	( IDENTIFIER EQUALS integer ITEM_TERMINATOR -> WS["\t"] IDENTIFIER WS[" "] EQUALS WS[" "] integer ITEM_TERMINATOR WS["\n"])
         {
-            defineFlagValue( SCOPE_TOP(NameSpace), SCOPE_TOP(Symbols), $message::messageName, $flags_def::flagName, $flags_def::flagList, $IDENTIFIER.text , $integer.text);
+            defineFlagValue( ctx, $message::messageName, $flags_def::flagName, $flags_def::flagList, $IDENTIFIER.text , $integer.text);
         }
 	;
 
@@ -184,7 +192,7 @@ field
     @init {$field::defaultValue=NULL;}
     :  ( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
     {
-        defineField(SCOPE_TOP(NameSpace),SCOPE_TOP(Symbols),$field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,1);
+        defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,1);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
         stringFree($field::defaultValue);
@@ -194,7 +202,7 @@ field
       | 
       ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
     {
-        defineField(SCOPE_TOP(NameSpace),SCOPE_TOP(Symbols),$field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,0);
+        defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,0);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
         stringFree($field::defaultValue);
@@ -255,7 +263,7 @@ array_spec
 default_value
 	:	SQBRACKET_OPEN DEFAULT EQUALS literal_value SQBRACKET_CLOSE
     {
-        $field::defaultValue=defaultValuePreprocess(SCOPE_TOP(NameSpace),SCOPE_TOP(Symbols),$field::fieldType, $literal_value.text);
+        $field::defaultValue=defaultValuePreprocess(ctx, $field::fieldType, $literal_value.text);
     }
 	;
 

@@ -28,9 +28,15 @@ void initSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->free = freeSymbolTable;
 }
 
-void definePackage(SCOPE_TYPE(NameSpace) symtab, pANTLR3_STRING id) {
-    symtab->package=id->factory->newRaw(id->factory);
-    symtab->package->appendS(symtab->package,id);
+void definePackage(pPBJParser ctx, pANTLR3_STRING id) {    
+    SCOPE_TOP(NameSpace)->package=id->factory->newRaw(id->factory);
+    SCOPE_TOP(NameSpace)->package->appendS(SCOPE_TOP(NameSpace)->package,id);
+}
+
+pANTLR3_STRING stringDup(pANTLR3_STRING s) {
+    pANTLR3_STRING retval=s->factory->newRaw(s->factory);
+    retval->appendS(retval,s);
+    return retval;
 }
 
 void stringFree(void* s) {
@@ -39,44 +45,40 @@ void stringFree(void* s) {
         id->factory->destroy(id->factory,id);
     }
 }
-pANTLR3_STRING stringDup(pANTLR3_STRING s) {
-    pANTLR3_STRING retval=s->factory->newRaw(s->factory);
-    retval->appendS(retval,s);
-    return retval;
-}
 
-void defineImport(SCOPE_TYPE(NameSpace) symtab, pANTLR3_STRING filename) {
+void defineImport(pPBJParser ctx, pANTLR3_STRING filename) {
+
     pANTLR3_STRING s=filename->factory->newRaw(filename->factory);
     s->appendS(s,filename);
-    symtab->imports->add(symtab->imports,s,&stringFree);
+    SCOPE_TOP(NameSpace)->imports->add(SCOPE_TOP(NameSpace)->imports,s,&stringFree);
     
 }
 
-void defineType(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING id) {
-    if (symtab == NULL) return;
-    symtab->types->put(symtab->types, id->chars, id, NULL);
+void defineType(pPBJParser ctx, pANTLR3_STRING id) {
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    SCOPE_TOP(Symbols)->types->put(SCOPE_TOP(Symbols)->types, id->chars, id, NULL);
 }
 
-void defineEnum(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
-    if (symtab == NULL) return;
-    defineType(ns, symtab,id);
+void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    defineType(ctx,id);
 }
-void defineEnumValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
-    if (symtab == NULL) return;
-    symtab->enum_values->put(symtab->enum_values, id->chars, value, NULL);
+void defineEnumValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING enumName, pANTLR3_LIST enumValues, pANTLR3_STRING id, pANTLR3_STRING value) {
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    SCOPE_TOP(Symbols)->enum_values->put(SCOPE_TOP(Symbols)->enum_values, id->chars, value, NULL);
 }
-void defineFlag(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST flagValues, unsigned int flagBits) {
+void defineFlag(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST flagValues, unsigned int flagBits) {
     unsigned int* bits=(unsigned int *)malloc(sizeof(unsigned int));
     *bits=flagBits;
-    if (symtab == NULL) return;
-    defineType(ns, symtab, id);
+    if (SCOPE_TOP(Symbols) == NULL) return;
+    defineType(ctx, id);
 
-    symtab->flag_sizes->put(symtab->flag_sizes,id->chars,bits,NULL);
+    SCOPE_TOP(Symbols)->flag_sizes->put(SCOPE_TOP(Symbols)->flag_sizes,id->chars,bits,NULL);
 }
 
-void defineFlagValue(SCOPE_TYPE(NameSpace) ns, SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
-    if (symtab == NULL) return;//FIXME
-    symtab->flag_values->put(symtab->enum_values, id->chars, id, NULL);
+void defineFlagValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING flagName, pANTLR3_LIST flagValues, pANTLR3_STRING id, pANTLR3_STRING value) {
+    if (SCOPE_TOP(Symbols) == NULL) return;//FIXME
+    SCOPE_TOP(Symbols)->flag_values->put(SCOPE_TOP(Symbols)->enum_values, id->chars, id, NULL);
 }
 
 ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name) {
@@ -153,10 +155,65 @@ void grammarToString	(pANTLR3_TREE_NODE_STREAM tns, pANTLR3_BASE_TREE p, pANTLR3
 		buf->addi   (buf, ANTLR3_TOKEN_UP);
 	}
 }
-
-pANTLR3_STRING defaultValuePreprocess(SCOPE_TYPE(NameSpace) ns,SCOPE_TYPE(Symbols) sym, pANTLR3_STRING type, pANTLR3_STRING value){
+static void openNamespace(pPBJParser ctx) {
+    pANTLR3_STRING substr;
+    pANTLR3_STRING rest=NULL;
+    if (SCOPE_TOP(NameSpace)->package) {
+        char *where=strchr(SCOPE_TOP(NameSpace)->package->chars,'.');
+        if (where) {
+            substr=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,0,where-(char*)SCOPE_TOP(NameSpace)->package->chars);
+            rest=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,where+1-(char*)SCOPE_TOP(NameSpace)->package->chars,SCOPE_TOP(NameSpace)->package->size);        
+        }else {
+            substr=stringDup(SCOPE_TOP(NameSpace)->package);
+        }
+        do {
+            fprintf(SCOPE_TOP(NameSpace)->output->cpp,"namespace %s {\n",substr->chars);
+            stringFree(substr);
+            substr=NULL;
+            if (rest) {
+                where=strstr(rest->chars,".");
+                if (where) {
+                    pANTLR3_STRING toBeFreed=rest;
+                    substr=rest->subString(rest,0,where-(char*)rest->chars);
+                    rest=rest->subString(rest,where-(char*)rest->chars,rest->size);
+                    stringFree(toBeFreed);
+                }else {
+                    substr=rest;
+                    rest=NULL;
+                }
+            }
+        }while (substr);
+    }
+}
+static void closeNamespace(pPBJParser ctx) {
+    if (SCOPE_TOP(NameSpace)->package) {
+        size_t stringSize=SCOPE_TOP(NameSpace)->package->size;
+        size_t i;
+        fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+        for (i=0;i<stringSize;++i) {       
+            if (SCOPE_TOP(NameSpace)->package->chars[i]=='.') {
+                fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+            }
+        }
+    }
+}
+pANTLR3_STRING defaultValuePreprocess(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING value){
     return stringDup(value);
 }
-void defineField(SCOPE_TYPE(NameSpace) nameSpace,SCOPE_TYPE(Symbols) symbols, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int multiplicitive_advanced_type){
+void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
+    openNamespace(ctx);
     
 }
+void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
+    openNamespace(ctx);
+}
+void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int multiplicitive_advanced_type){
+}
+void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
+    closeNamespace(ctx);
+}
+
+void defineExtensionEnd(pPBJParser ctx, pANTLR3_STRING id){
+    closeNamespace(ctx);
+}
+    
