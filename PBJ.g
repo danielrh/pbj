@@ -14,6 +14,7 @@ tokens
 
 scope NameSpace {
     struct LanguageOutputStruct* output;
+    pANTLR3_STRING filename;
     pANTLR3_STRING package;
     pANTLR3_LIST imports;
 }
@@ -21,7 +22,9 @@ scope NameSpace {
 scope Symbols {
     pANTLR3_HASH_TABLE types;
     pANTLR3_HASH_TABLE flag_sizes;
+    pANTLR3_HASH_TABLE enum_sizes;
     pANTLR3_HASH_TABLE flag_values;
+    pANTLR3_HASH_TABLE flag_all_on;
     pANTLR3_HASH_TABLE enum_values;
 }
 
@@ -39,7 +42,7 @@ protocol
 protoroot
     scope NameSpace;
     @init {
-        initNameSpace(SCOPE_TOP(NameSpace));
+        initNameSpace(ctx,SCOPE_TOP(NameSpace));
     }
 	:	importrule* package importrule* message*
 	|	(importrule* message* -> PACKAGELITERAL["package"] WS[" "] STRING_LITERAL["_PBJ_Internal"] ITEM_TERMINATOR[";"] WS["\n"] importrule* message*)

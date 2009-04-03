@@ -2,13 +2,14 @@
 extern "C" {
 #include "PBJParseUtil.h"
 }
+
 int main(int argc, char *argv[])
 {
     pANTLR3_UINT8 filename;
     pANTLR3_INPUT_STREAM input;
     pPBJLexer lxr;
     pANTLR3_COMMON_TOKEN_STREAM tstream;
-    pPBJParser psr;
+    pPBJParser psr,ctx;
     PBJParser_protocol_return     pbjAST;
     if (argc < 2 || argv[1] == NULL)
         filename = (pANTLR3_UINT8)"./input";
@@ -33,11 +34,17 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    psr = PBJParserNew(tstream);
+    psr = ctx = PBJParserNew(tstream);
     if (psr == NULL) {
-	fprintf(stderr, "Out of memory trying to allocate parser\n");
-	exit(ANTLR3_ERR_NOMEM);
+        fprintf(stderr, "Out of memory trying to allocate parser\n");
+        exit(ANTLR3_ERR_NOMEM);
     }
+    ctx->pPBJParser_NameSpaceTop=NameSpacePush(ctx);
+    SCOPE_TOP(NameSpace)->filename=tstream->tstream->tokenSource->strFactory->newRaw(tstream->tstream->tokenSource->strFactory);
+    SCOPE_TOP(NameSpace)->filename->append8(SCOPE_TOP(NameSpace)->filename,(const char*)filename);
+    SCOPE_TOP(NameSpace)->output=(struct LanguageOutputStruct*)malloc(sizeof(struct LanguageOutputStruct));
+    SCOPE_TOP(NameSpace)->output->cs=NULL;
+    SCOPE_TOP(NameSpace)->output->cpp=stdout;//could open something dependent on filename
 
     pbjAST=psr->protocol(psr);
     if (psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec) > 0)
@@ -62,11 +69,17 @@ int main(int argc, char *argv[])
         stringFree(s);
         nodes   ->free  (nodes);        nodes   = NULL;
     }
+    if (SCOPE_TOP(NameSpace)->output->cpp)
+        fclose(SCOPE_TOP(NameSpace)->output->cpp);
+    if (SCOPE_TOP(NameSpace)->output->cs)
+        fclose(SCOPE_TOP(NameSpace)->output->cs);
+    NameSpacePop(ctx);
     psr->free(psr);
     psr = NULL;
 
     tstream->free(tstream);
     tstream = NULL;
+
 
     lxr->free(lxr);
     lxr = NULL;
