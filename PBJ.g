@@ -412,9 +412,10 @@ BOOL	:	'bool';
 BYTES   :   'bytes';
 STRING   :   'string';
 
-// Advanced Type Elements
-BYTE : 'byte';
 UUID : 'uuid';
+ANGLE : 'angle';
+TIME : 'time';
+DURATION : 'duration';
 NORMAL : 'normal';
 VECTOR2F : 'vector2f';
 VECTOR2D : 'vector2d';
@@ -423,9 +424,6 @@ VECTOR3D : 'vector3d';
 VECTOR4F : 'vector4f';
 VECTOR4D : 'vector4d';
 QUATERNION : 'quaternion';
-ANGLE : 'angle';
-TIME : 'time';
-DURATION : 'duration';
 BOUNDINGSPHERE3F : 'boundingsphere3f';
 BOUNDINGSPHERE3D : 'boundingsphere3d';
 BOUNDINGBOX3F3F : 'boundingbox3f3f';
