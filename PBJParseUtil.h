@@ -16,7 +16,7 @@ typedef struct LanguageOutputStruct {
     FILE * cs;
 } LanguageOutput;
 
-void initSymbolTable(SCOPE_TYPE(Symbols) symtab);
+void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING msgId);
 void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab);
 
 void definePackage(pPBJParser ctx, pANTLR3_STRING id);

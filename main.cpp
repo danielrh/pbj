@@ -15,7 +15,11 @@ int main(int argc, char *argv[])
         filename = (pANTLR3_UINT8)"./input";
     else
         filename = (pANTLR3_UINT8)argv[1];
-
+    const char * outputFilename="output";
+    if (argc>=3) {
+        outputFilename=argv[2];
+    }
+    
     input = antlr3AsciiFileStreamNew(filename);
     if ( input == NULL ) {
         fprintf(stderr, "Failed to open file %s\n", (char *)filename);
@@ -41,7 +45,7 @@ int main(int argc, char *argv[])
     }
     ctx->pPBJParser_NameSpaceTop=NameSpacePush(ctx);
     SCOPE_TOP(NameSpace)->filename=tstream->tstream->tokenSource->strFactory->newRaw(tstream->tstream->tokenSource->strFactory);
-    SCOPE_TOP(NameSpace)->filename->append8(SCOPE_TOP(NameSpace)->filename,(const char*)filename);
+    SCOPE_TOP(NameSpace)->filename->append8(SCOPE_TOP(NameSpace)->filename,(const char*)outputFilename);
     SCOPE_TOP(NameSpace)->output=(struct LanguageOutputStruct*)malloc(sizeof(struct LanguageOutputStruct));
     SCOPE_TOP(NameSpace)->output->cs=NULL;
     SCOPE_TOP(NameSpace)->output->cpp=stdout;//could open something dependent on filename
@@ -58,10 +62,6 @@ int main(int argc, char *argv[])
         nodes   = antlr3CommonTreeNodeStreamNewTree(pbjAST.tree, ANTLR3_SIZE_HINT); // sIZE HINT WILL SOON BE DEPRECATED!!
         pANTLR3_STRING s = nodes->stringFactory->newRaw(nodes->stringFactory);
         grammarToString(nodes->tnstream,nodes->root,NULL,s);
-        const char * outputFilename="output";
-        if (argc>=3) {
-            outputFilename=argv[2];
-        }
         FILE*fp=fopen(outputFilename,"w");
         if (s->size>1)
             fwrite(s->chars,s->size-1,1,fp);

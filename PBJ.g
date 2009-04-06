@@ -20,6 +20,7 @@ scope NameSpace {
 }
 
 scope Symbols {
+    pANTLR3_STRING message;
     pANTLR3_HASH_TABLE types;
     pANTLR3_HASH_TABLE flag_sizes;
     pANTLR3_HASH_TABLE enum_sizes;
@@ -34,7 +35,7 @@ scope Symbols {
 protocol
     scope Symbols;
     @init {
-        initSymbolTable(SCOPE_TOP(Symbols));
+        initSymbolTable(SCOPE_TOP(Symbols),NULL);
     }
     : protoroot ->protoroot
     ;
@@ -102,7 +103,7 @@ message_elements
     scope Symbols;
     @init
     {
-        initSymbolTable(SCOPE_TOP(Symbols));  
+        initSymbolTable(SCOPE_TOP(Symbols), $message::messageName);  
     }
 	:	message_element*
     {

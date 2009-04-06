@@ -9,6 +9,7 @@ void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->flag_values->free(symtab->flag_values);
     symtab->flag_all_on->free(symtab->flag_all_on);
     symtab->enum_values->free(symtab->enum_values);
+    stringFree(symtab->message);
 }
 void ANTLR3_CDECL freeNameSpace(SCOPE_TYPE(NameSpace) symtab) {
     symtab->imports->free(symtab->imports);
@@ -29,7 +30,8 @@ void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
             lst=symtab->filename->chars[symtab->filename->len-6];
             assert(lst=='.');
             symtab->filename->chars[symtab->filename->len-6]='\0';
-        }        
+        }
+        fprintf(symtab->output->cpp,"#include \"pbj.hpp\"\n",symtab->filename->chars);
         fprintf(symtab->output->cpp,"#include \"%s.pb.h\"\n",symtab->filename->chars);
         if (symtab->filename->len>6) {
             symtab->filename->chars[symtab->filename->len-6]=lst;
@@ -40,13 +42,16 @@ void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     symtab->free=freeNameSpace;
     
 }
-void initSymbolTable(SCOPE_TYPE(Symbols) symtab) {
+void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName) {
     symtab->types = antlr3HashTableNew(11);
     symtab->flag_all_on = antlr3HashTableNew(11);
     symtab->flag_sizes = antlr3HashTableNew(11);
     symtab->enum_sizes = antlr3HashTableNew(11);
     symtab->flag_values = antlr3HashTableNew(11);
     symtab->enum_values = antlr3HashTableNew(11);
+    if (messageName&&symtab->message==NULL) {
+        symtab->message=stringDup(messageName);
+    }
     symtab->free = freeSymbolTable;
 }
 
@@ -172,7 +177,7 @@ static void openNamespace(pPBJParser ctx) {
     pANTLR3_STRING substr;
     pANTLR3_STRING rest=NULL;
     if (SCOPE_TOP(NameSpace)->package) {
-        char *where=strchr(SCOPE_TOP(NameSpace)->package->chars,'.');
+        char *where=strchr((char*)SCOPE_TOP(NameSpace)->package->chars,'.');
         if (where) {
             substr=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,0,where-(char*)SCOPE_TOP(NameSpace)->package->chars);
             rest=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,where+1-(char*)SCOPE_TOP(NameSpace)->package->chars,SCOPE_TOP(NameSpace)->package->size);        
@@ -184,7 +189,7 @@ static void openNamespace(pPBJParser ctx) {
             stringFree(substr);
             substr=NULL;
             if (rest) {
-                where=strstr(rest->chars,".");
+                where=strstr((char*)rest->chars,".");
                 if (where) {
                     pANTLR3_STRING toBeFreed=rest;
                     substr=rest->subString(rest,0,where-(char*)rest->chars);
@@ -226,6 +231,7 @@ static void sendTabs(pPBJParser ctx,int offset) {
 void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
     if (CPPFP) {
+        SCOPE_TOP(Symbols)->message=stringDup(id);
         sendTabs(ctx,1);
         fprintf(CPPFP,"class %s : protected _PBJ_Internal::%s {\n",id->chars,id->chars);
         sendTabs(ctx,2);
@@ -257,9 +263,9 @@ void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
     }
 }
 const char *preValidator(FILE*fp, pANTLR3_STRING type, const char* cppType, const char* protoType, const char* defaultName, int returnValid) {
-    if (strcmp(type->chars,"uuid")==0)
-        fprintf(fp, "try {return Sirikata::UUID(");
-    else if (strcmp(type->chars,"time")==0||strcmp(type->chars,"duration")==0) {
+    if (strcmp((char*)type->chars,"uuid")==0)
+        fprintf(fp, "try {return PBJ::UUID(");
+    else if (strcmp((char*)type->chars,"time")==0||strcmp((char*)type->chars,"duration")==0) {
         if (returnValid)
             fprintf(fp,"return (");
         else
@@ -269,12 +275,12 @@ const char *preValidator(FILE*fp, pANTLR3_STRING type, const char* cppType, cons
     }
 }
 void postValidator(FILE*fp, pANTLR3_STRING type, const char* cppType, const char* protoType, const char* defaultName, int returnValid) {
-    if (strcmp(type->chars,"uuid")==0)
+    if (strcmp((char*)type->chars,"uuid")==0)
         fprintf(fp,
-                ",Sirikata::HumanReadable())%s;}catch(std::invalid_arguments& ia){return %s;}",
+                ",PBJ::HumanReadable())%s;}catch(std::invalid_arguments& ia){return %s;}",
                 returnValid?",true":"",
                 returnValid?(defaultName?defaultName:"UUID::null()"):"false");
-    else if (strcmp(type->chars,"time")==0||strcmp(type->chars,"duration")==0) {
+    else if (strcmp((char*)type->chars,"time")==0||strcmp((char*)type->chars,"duration")==0) {
         fprintf(fp,"%s);",returnValid?",true":"");
     } else {
         fprintf(fp,"%s);",returnValid?",true":"");
@@ -297,76 +303,76 @@ const char *getProtoType(pPBJParser ctx, pANTLR3_STRING type) {
         }
         return "::google::protobuf::uint8";
     }
-    if (strcmp(type->chars,"string")==0)
+    if (strcmp((char*)type->chars,"string")==0)
         return "::std::string";
-    if (strcmp(type->chars,"bytes")==0)
+    if (strcmp((char*)type->chars,"bytes")==0)
         return "::std::string";
-    if (strcmp(type->chars,"uuid")==0)
+    if (strcmp((char*)type->chars,"uuid")==0)
         return "::std::string";
-    if (strcmp(type->chars,"time")==0)
+    if (strcmp((char*)type->chars,"time")==0)
         return "::google::protobuf::int64";
-    if (strcmp(type->chars,"duration")==0)
+    if (strcmp((char*)type->chars,"duration")==0)
         return "::google::protobuf::int64";
-    if (strcmp(type->chars,"angle")==0)
+    if (strcmp((char*)type->chars,"angle")==0)
         return "float";
 
-    if (strcmp(type->chars,"sint64")==0)
+    if (strcmp((char*)type->chars,"sint64")==0)
         return "::google::protobuf::int64";
-    if (strcmp(type->chars,"int64")==0)
+    if (strcmp((char*)type->chars,"int64")==0)
         return "::google::protobuf::int64";
-    if (strcmp(type->chars,"sint32")==0)
+    if (strcmp((char*)type->chars,"sint32")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"int32")==0)
+    if (strcmp((char*)type->chars,"int32")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"sint16")==0)
+    if (strcmp((char*)type->chars,"sint16")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"int16")==0)
+    if (strcmp((char*)type->chars,"int16")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"sint8")==0)
+    if (strcmp((char*)type->chars,"sint8")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"int8")==0)
+    if (strcmp((char*)type->chars,"int8")==0)
         return "::google::protobuf::int32";
 
 
-    if (strcmp(type->chars,"sfixed64")==0)
+    if (strcmp((char*)type->chars,"sfixed64")==0)
         return "::google::protobuf::int64";
-    if (strcmp(type->chars,"sfixed32")==0)
+    if (strcmp((char*)type->chars,"sfixed32")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"sfixed16")==0)
+    if (strcmp((char*)type->chars,"sfixed16")==0)
         return "::google::protobuf::int32";
-    if (strcmp(type->chars,"sfixed8")==0)
+    if (strcmp((char*)type->chars,"sfixed8")==0)
         return "::google::protobuf::int32";
 
-    if (strcmp(type->chars,"fixed64")==0)
+    if (strcmp((char*)type->chars,"fixed64")==0)
         return "::google::protobuf::uint64";
-    if (strcmp(type->chars,"uint64")==0)
+    if (strcmp((char*)type->chars,"uint64")==0)
         return "::google::protobuf::uint64";
-    if (strcmp(type->chars,"fixed32")==0)
+    if (strcmp((char*)type->chars,"fixed32")==0)
         return "::google::protobuf::uint32";
-    if (strcmp(type->chars,"uint32")==0)
+    if (strcmp((char*)type->chars,"uint32")==0)
         return "::google::protobuf::uint32";
-    if (strcmp(type->chars,"fixed16")==0)
+    if (strcmp((char*)type->chars,"fixed16")==0)
         return "::google::protobuf::uint32";
-    if (strcmp(type->chars,"uint16")==0)
+    if (strcmp((char*)type->chars,"uint16")==0)
         return "::google::protobuf::uint32";
-    if (strcmp(type->chars,"fixed8")==0)
+    if (strcmp((char*)type->chars,"fixed8")==0)
         return "::google::protobuf::uint32";
-    if (strcmp(type->chars,"uint8")==0)
+    if (strcmp((char*)type->chars,"uint8")==0)
         return "::google::protobuf::uint32";
-    if (strcmp(type->chars,"float")==0||strcmp(type->chars,"normal")==0||strcmp(type->chars,"vector2f")==0||strcmp(type->chars,"vector3f")==0||strcmp(type->chars,"vector4f")==0||strcmp(type->chars,"quaternion")==0||strcmp(type->chars,"boundingsphere3f")==0||strcmp(type->chars,"boundingbox3f3f")==0)
+    if (strcmp((char*)type->chars,"float")==0||strcmp((char*)type->chars,"normal")==0||strcmp((char*)type->chars,"vector2f")==0||strcmp((char*)type->chars,"vector3f")==0||strcmp((char*)type->chars,"vector4f")==0||strcmp((char*)type->chars,"quaternion")==0||strcmp((char*)type->chars,"boundingsphere3f")==0||strcmp((char*)type->chars,"boundingbox3f3f")==0)
         return "float";
-    if (strcmp(type->chars,"double")==0||strcmp(type->chars,"vector2d")==0||strcmp(type->chars,"vector3d")==0||strcmp(type->chars,"vector4d")==0||strcmp(type->chars,"boundingsphere3d")==0||strcmp(type->chars,"boundingbox3d3f")==0)
+    if (strcmp((char*)type->chars,"double")==0||strcmp((char*)type->chars,"vector2d")==0||strcmp((char*)type->chars,"vector3d")==0||strcmp((char*)type->chars,"vector4d")==0||strcmp((char*)type->chars,"boundingsphere3d")==0||strcmp((char*)type->chars,"boundingbox3d3f")==0)
         return "double";
-    return type->chars;
+    return (const char*)type->chars;
 }
 int getNumItemsPerElement(pPBJParser ctx, pANTLR3_STRING type) {
-    if (strcmp(type->chars,"normal")==0||strcmp(type->chars,"vector2f")==0||strcmp(type->chars,"vector2d")==0)
+    if (strcmp((char*)type->chars,"normal")==0||strcmp((char*)type->chars,"vector2f")==0||strcmp((char*)type->chars,"vector2d")==0)
         return 2;
-    if (strcmp(type->chars,"quaternion")==0||strcmp(type->chars,"vector3f")==0||strcmp(type->chars,"vector3d")==0)
+    if (strcmp((char*)type->chars,"quaternion")==0||strcmp((char*)type->chars,"vector3f")==0||strcmp((char*)type->chars,"vector3d")==0)
         return 3;
-    if (strcmp(type->chars,"vector4f")==0||strcmp(type->chars,"vector4d")==0||strcmp(type->chars,"boundingsphere3f")==0||strcmp(type->chars,"boundingsphere3d")==0)
+    if (strcmp((char*)type->chars,"vector4f")==0||strcmp((char*)type->chars,"vector4d")==0||strcmp((char*)type->chars,"boundingsphere3f")==0||strcmp((char*)type->chars,"boundingsphere3d")==0)
         return 4;
-    if (strcmp(type->chars,"boundingbox3f3f")==0||strcmp(type->chars,"boundingbox3d3f")==0)
+    if (strcmp((char*)type->chars,"boundingbox3f3f")==0||strcmp((char*)type->chars,"boundingbox3d3f")==0)
         return 6;
     return 1;
 }
@@ -374,95 +380,95 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
     int *flagBits=NULL;
     if (flagBits=SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
         if (*flagBits>32) {
-            return "Sirikata::uint64";
+            return "PBJ::uint64";
         }
         if (*flagBits>16) {
-            return "Sirikata::uint32";
+            return "PBJ::uint32";
         }
         if (*flagBits>8) {
-            return "Sirikata::uint16";
+            return "PBJ::uint16";
         }
-        return "Sirikata::uint8";
+        return "PBJ::uint8";
     }
-    if (strcmp(type->chars,"string")==0)
+    if (strcmp((char*)type->chars,"string")==0)
         return "::std::string";
-    if (strcmp(type->chars,"bytes")==0)
+    if (strcmp((char*)type->chars,"bytes")==0)
         return "::std::string";
-    if (strcmp(type->chars,"uuid")==0)
-        return "Sirikata::UUID";
-    if (strcmp(type->chars,"time")==0)
-        return "Sirikata::Time";
-    if (strcmp(type->chars,"duration")==0)
-        return "Sirikata::Duration";
-    if (strcmp(type->chars,"angle")==0)
+    if (strcmp((char*)type->chars,"uuid")==0)
+        return "PBJ::UUID";
+    if (strcmp((char*)type->chars,"time")==0)
+        return "PBJ::Time";
+    if (strcmp((char*)type->chars,"duration")==0)
+        return "PBJ::Duration";
+    if (strcmp((char*)type->chars,"angle")==0)
         return "float";
-    if (strcmp(type->chars,"sint64")==0)
-        return "Sirikata::int64";
-    if (strcmp(type->chars,"int64")==0)
-        return "Sirikata::int64";
-    if (strcmp(type->chars,"sint32")==0)
-        return "Sirikata::int32";
-    if (strcmp(type->chars,"int32")==0)
-        return "Sirikata::int32";
-    if (strcmp(type->chars,"sint16")==0)
-        return "Sirikata::int16";
-    if (strcmp(type->chars,"int16")==0)
-        return "Sirikata::int16";
-    if (strcmp(type->chars,"sint8")==0)
-        return "Sirikata::int8";
-    if (strcmp(type->chars,"int8")==0)
-        return "Sirikata::int8";
+    if (strcmp((char*)type->chars,"sint64")==0)
+        return "PBJ::int64";
+    if (strcmp((char*)type->chars,"int64")==0)
+        return "PBJ::int64";
+    if (strcmp((char*)type->chars,"sint32")==0)
+        return "PBJ::int32";
+    if (strcmp((char*)type->chars,"int32")==0)
+        return "PBJ::int32";
+    if (strcmp((char*)type->chars,"sint16")==0)
+        return "PBJ::int16";
+    if (strcmp((char*)type->chars,"int16")==0)
+        return "PBJ::int16";
+    if (strcmp((char*)type->chars,"sint8")==0)
+        return "PBJ::int8";
+    if (strcmp((char*)type->chars,"int8")==0)
+        return "PBJ::int8";
 
-    if (strcmp(type->chars,"sfixed64")==0)
-        return "Sirikata::int64";
-    if (strcmp(type->chars,"sfixed32")==0)
-        return "Sirikata::int32";
-    if (strcmp(type->chars,"sfixed16")==0)
-        return "Sirikata::int16";
-    if (strcmp(type->chars,"sfixed8")==0)
-        return "Sirikata::int8";
+    if (strcmp((char*)type->chars,"sfixed64")==0)
+        return "PBJ::int64";
+    if (strcmp((char*)type->chars,"sfixed32")==0)
+        return "PBJ::int32";
+    if (strcmp((char*)type->chars,"sfixed16")==0)
+        return "PBJ::int16";
+    if (strcmp((char*)type->chars,"sfixed8")==0)
+        return "PBJ::int8";
 
-    if (strcmp(type->chars,"fixed64")==0)
-        return "Sirikata::uint64";
-    if (strcmp(type->chars,"uint64")==0)
-        return "Sirikata::uint64";
-    if (strcmp(type->chars,"fixed32")==0)
-        return "Sirikata::uint32";
-    if (strcmp(type->chars,"uint32")==0)
-        return "Sirikata::uint32";
-    if (strcmp(type->chars,"fixed16")==0)
-        return "Sirikata::uint16";
-    if (strcmp(type->chars,"uint16")==0)
-        return "Sirikata::uint16";
-    if (strcmp(type->chars,"fixed8")==0)
-        return "Sirikata::uint8";
-    if (strcmp(type->chars,"uint8")==0)
-        return "Sirikata::uint8";
-    if (strcmp(type->chars,"normal")==0)
-        return "Sirikata::Vector3f";
-    if (strcmp(type->chars,"vector2f")==0)
-        return "Sirikata::Vector2f";        
-    if (strcmp(type->chars,"vector2d")==0)
-        return "Sirikata::Vector2f";        
-    if (strcmp(type->chars,"quaternion")==0)
-        return "Sirikata::Quaternion";
-    if (strcmp(type->chars,"vector3f")==0)
-        return "Sirikata::Vector3f";
-    if (strcmp(type->chars,"vector3d")==0)
-        return "Sirikata::Vector3d";
-    if (strcmp(type->chars,"vector4f")==0)
-        return "Sirikata::Vector4f";
-    if (strcmp(type->chars,"vector4d")==0)
-        return "Sirikata::Vector4d";
-    if (strcmp(type->chars,"boundingsphere3f")==0)
-        return "Sirikata::BoundingSphere3f";
-    if (strcmp(type->chars,"boundingsphere3d")==0)
-        return "Sirikata::BoundingSphere3d";
-    if (strcmp(type->chars,"boundingbox3f3f")==0)
-        return "Sirikata::BoundingBox3f3f";
-    if (strcmp(type->chars,"boundingbox3d3f")==0)
-        return "Sirikata::BoundingBox3d3f";
-    return type->chars;
+    if (strcmp((char*)type->chars,"fixed64")==0)
+        return "PBJ::uint64";
+    if (strcmp((char*)type->chars,"uint64")==0)
+        return "PBJ::uint64";
+    if (strcmp((char*)type->chars,"fixed32")==0)
+        return "PBJ::uint32";
+    if (strcmp((char*)type->chars,"uint32")==0)
+        return "PBJ::uint32";
+    if (strcmp((char*)type->chars,"fixed16")==0)
+        return "PBJ::uint16";
+    if (strcmp((char*)type->chars,"uint16")==0)
+        return "PBJ::uint16";
+    if (strcmp((char*)type->chars,"fixed8")==0)
+        return "PBJ::uint8";
+    if (strcmp((char*)type->chars,"uint8")==0)
+        return "PBJ::uint8";
+    if (strcmp((char*)type->chars,"normal")==0)
+        return "PBJ::Vector3f";
+    if (strcmp((char*)type->chars,"vector2f")==0)
+        return "PBJ::Vector2f";        
+    if (strcmp((char*)type->chars,"vector2d")==0)
+        return "PBJ::Vector2f";        
+    if (strcmp((char*)type->chars,"quaternion")==0)
+        return "PBJ::Quaternion";
+    if (strcmp((char*)type->chars,"vector3f")==0)
+        return "PBJ::Vector3f";
+    if (strcmp((char*)type->chars,"vector3d")==0)
+        return "PBJ::Vector3d";
+    if (strcmp((char*)type->chars,"vector4f")==0)
+        return "PBJ::Vector4f";
+    if (strcmp((char*)type->chars,"vector4d")==0)
+        return "PBJ::Vector4d";
+    if (strcmp((char*)type->chars,"boundingsphere3f")==0)
+        return "PBJ::BoundingSphere3f";
+    if (strcmp((char*)type->chars,"boundingsphere3d")==0)
+        return "PBJ::BoundingSphere3d";
+    if (strcmp((char*)type->chars,"boundingbox3f3f")==0)
+        return "PBJ::BoundingBox3f3f";
+    if (strcmp((char*)type->chars,"boundingbox3d3f")==0)
+        return "PBJ::BoundingBox3d3f";
+    return (char*)type->chars;
 }
 void printFlags(FILE *fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
     pANTLR3_STRING all_on =((pANTLR3_STRING)(flag_all_on->get(flag_all_on,name->chars)));
@@ -548,17 +554,11 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 
                 sendTabs(ctx,1);fprintf(CPPFP,"inline int %s_size() const {return super->%s_size();}\n",name->chars,name->chars);
 
-                if (strcmp(type->chars,"bytes")==0||strcmp(type->chars,"string")==0) {//strings and bytes have special setter functionality
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(int index, const string&value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+                if (strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0) {//strings and bytes have special setter functionality
                     sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(int index, const char *value) const {\n",name->chars);
                     sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     sendTabs(ctx,1);fprintf(CPPFP,"inline int add_%s(const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->add_%s(value);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline int add_%s(const string&value) const {\n",name->chars);
                     sendTabs(ctx,2);fprintf(CPPFP,"return super->add_%s(value);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     sendTabs(ctx,1);fprintf(CPPFP,"inline const ::std::string& %s(int index) const {\n",name->chars);
@@ -566,7 +566,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");                    
                     sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<size()); return true;}\n",name->chars);
                     
-                    if (strcmp(type->chars,"bytes")) {
+                    if (strcmp((char*)type->chars,"bytes")==0) {
                         sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(int index, const void *value, size_t size) const {\n",name->chars);
                         sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value,size);\n",name->chars);
                         sendTabs(ctx,1);fprintf(CPPFP,"}\n");
@@ -660,12 +660,12 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,2);fprintf(CPPFP,"}\n");
                 }
                 sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                if (strcmp(type->chars,"bytes")==0||strcmp(type->chars,"string")==0) {//strings and bytes have special setter functionality
+                if (strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0) {//strings and bytes have special setter functionality
                     sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(const char *value) const {\n",name->chars);
                     sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(value);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     
-                    if (strcmp(type->chars,"bytes")==0) {
+                    if (strcmp((char*)type->chars,"bytes")==0) {
                         sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(const void *value, size_t size) const {\n",name->chars);
                         sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(value,size);\n",name->chars);
                         sendTabs(ctx,1);fprintf(CPPFP,"}\n");
@@ -683,8 +683,9 @@ void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumV
     for (i=0;i<enumSize;i+=2) {
         pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
         sendTabs(ctx,2);
-        fprintf(CPPFP,"%s=_PBJ_Internal::%s%s",
+        fprintf(CPPFP,"%s=_PBJ_Internal::%s::%s%s",
                 enumVal->chars,
+                SCOPE_TOP(Symbols)->message->chars,
                 enumVal->chars,
                 (i+2==enumSize?"\n":",\n"));            
     }
@@ -703,7 +704,7 @@ void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, p
     ANTLR3_INT32 size=enumValues->size(enumValues);
     for (i=0;i<size;++i) {
         void * elem=enumValues->get(enumValues,i);
-        int val=atoi(((pANTLR3_STRING)elem)->chars);
+        int val=atoi((char*)((pANTLR3_STRING)elem)->chars);
         if (val>*maxval) *maxval=val;
     }
     SCOPE_TOP(Symbols)->enum_sizes->put(SCOPE_TOP(Symbols)->enum_sizes,id->chars,maxval,&free);        

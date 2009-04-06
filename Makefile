@@ -1,4 +1,9 @@
-
+output: output.pbj.hpp output.pb.h
+	gcc -o output test.cpp -Wall -I/Users/danielrh/sirikata/dependencies/include	-I/Users/danielrh/sirikata/libcore/src -I/Users/danielrh/sirikata/dependencies/include -I/Users/danielrh/sirikata/dependencies/include/boost-1_35
+output.pb.h: output.pbj.hpp
+	/Users/danielrh/sirikata/dependencies/bin/protoc --cpp_out=. output.proto
+output.pbj.hpp: pbj output.proto
+	./pbj protocol/Test.proto output.proto > output.pbj.hpp
 pbj : main.cpp PBJ.h PBJLexer.o PBJParser.o PBJParseUtil.o
 	g++ -std=c++98 -static -g2 -o pbj -Iantlr-3.1.2/include -Lantlr-3.1.2/lib -I/usr/local/include -L/usr/local/lib main.cpp PBJLexer.o PBJParser.o PBJParseUtil.o -lantlr3c || g++ -o pbj -Iantlr-3.1.2/include -Lantlr-3.1.2/lib -I/usr/local/include -L/usr/local/lib -g2 main.cpp PBJLexer.o PBJParser.o PBJParseUtil.o antlr-3.1.2/lib/libantlr3c.a || g++ -o pbj -Iantlr-3.1.2/include -Lantlr-3.1.2/lib -I/usr/local/include -L/usr/local/lib -g2 main.cpp PBJLexer.o PBJParser.o PBJParseUtil.o -lantlr3c
 
