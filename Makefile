@@ -1,7 +1,8 @@
+SIRIKATA = "/home/daniel/sirikata"
 output: output.pbj.hpp output.pb.h
-	gcc -o output test.cpp -Wall -I/Users/danielrh/sirikata/dependencies/include	-I/Users/danielrh/sirikata/libcore/src -I/Users/danielrh/sirikata/dependencies/include -I/Users/danielrh/sirikata/dependencies/include/boost-1_35
+	gcc -o output test.cpp -Wall -I${SIRIKATA}/dependencies/include	-I${SIRIKATA}/libcore/src -I${SIRIKATA}//dependencies/include -I${SIRIKATA}/dependencies/include/boost-1_35 -I${SIRIKATA}/dependencies/include/boost-1_37
 output.pb.h: output.pbj.hpp
-	/Users/danielrh/sirikata/dependencies/bin/protoc --cpp_out=. output.proto
+	${SIRIKATA}/dependencies/bin/protoc --cpp_out=. output.proto
 output.pbj.hpp: pbj output.proto
 	./pbj protocol/Test.proto output.proto > output.pbj.hpp
 pbj : main.cpp PBJ.h PBJLexer.o PBJParser.o PBJParseUtil.o

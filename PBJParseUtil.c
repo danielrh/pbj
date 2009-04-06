@@ -9,7 +9,9 @@ void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->flag_values->free(symtab->flag_values);
     symtab->flag_all_on->free(symtab->flag_all_on);
     symtab->enum_values->free(symtab->enum_values);
-    stringFree(symtab->message);
+    if (symtab->message) {
+        stringFree(symtab->message);
+    }
 }
 void ANTLR3_CDECL freeNameSpace(SCOPE_TYPE(NameSpace) symtab) {
     symtab->imports->free(symtab->imports);
@@ -43,6 +45,7 @@ void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     
 }
 void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName) {
+    symtab->message=NULL;
     symtab->types = antlr3HashTableNew(11);
     symtab->flag_all_on = antlr3HashTableNew(11);
     symtab->flag_sizes = antlr3HashTableNew(11);
@@ -56,13 +59,13 @@ void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName) {
 }
 
 void definePackage(pPBJParser ctx, pANTLR3_STRING id) {    
-    SCOPE_TOP(NameSpace)->package=id->factory->newRaw(id->factory);
-    SCOPE_TOP(NameSpace)->package->appendS(SCOPE_TOP(NameSpace)->package,id);
+    
+    SCOPE_TOP(NameSpace)->package=stringDup(id);
+
 }
 
 pANTLR3_STRING stringDup(pANTLR3_STRING s) {
-    pANTLR3_STRING retval=s->factory->newRaw(s->factory);
-    retval->appendS(retval,s);
+    pANTLR3_STRING retval=s->factory->newPtr(s->factory,s->chars,s->len);
     return retval;
 }
 
@@ -173,11 +176,20 @@ void grammarToString	(pANTLR3_TREE_NODE_STREAM tns, pANTLR3_BASE_TREE p, pANTLR3
 		buf->addi   (buf, ANTLR3_TOKEN_UP);
 	}
 }
+static char* stringChar(pANTLR3_STRING str, ANTLR3_UINT8 searchme) {
+    int i;
+    for (i=0;i<str->len;++i) {
+        if (str->chars[i]==searchme) {
+            return &str->chars[i];
+        }
+    }
+    return NULL;
+}
 static void openNamespace(pPBJParser ctx) {
     pANTLR3_STRING substr;
     pANTLR3_STRING rest=NULL;
     if (SCOPE_TOP(NameSpace)->package) {
-        char *where=strchr((char*)SCOPE_TOP(NameSpace)->package->chars,'.');
+        char *where=stringChar(SCOPE_TOP(NameSpace)->package,'.');
         if (where) {
             substr=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,0,where-(char*)SCOPE_TOP(NameSpace)->package->chars);
             rest=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,where+1-(char*)SCOPE_TOP(NameSpace)->package->chars,SCOPE_TOP(NameSpace)->package->size);        
@@ -189,7 +201,7 @@ static void openNamespace(pPBJParser ctx) {
             stringFree(substr);
             substr=NULL;
             if (rest) {
-                where=strstr((char*)rest->chars,".");
+                where=stringChar(rest,'.');
                 if (where) {
                     pANTLR3_STRING toBeFreed=rest;
                     substr=rest->subString(rest,0,where-(char*)rest->chars);
@@ -237,15 +249,15 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,2);
         fprintf(CPPFP,"_PBJ_Internal::%s *super;\n",id->chars);
         sendTabs(ctx,1);
-        fprintf(CPPFP,"public:\n",id->chars,id->chars);
+        fprintf(CPPFP,"public:\n");
         sendTabs(ctx,2);
         fprintf(CPPFP,"%s() {\n",id->chars);
         sendTabs(ctx,3);
         fprintf(CPPFP,"super=this;\n");
         sendTabs(ctx,2);
-        fprintf(CPPFP,"}\n",id->chars);
+        fprintf(CPPFP,"}\n");
         sendTabs(ctx,2);
-        fprintf(CPPFP,"%s(_PBJ_Internal::%s&reference) {\n",id->chars);
+        fprintf(CPPFP,"%s(_PBJ_Internal::%s&reference) {\n",id->chars,id->chars);
         sendTabs(ctx,3);
         fprintf(CPPFP,"super=&reference;\n");
         sendTabs(ctx,2);
@@ -470,6 +482,22 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
         return "PBJ::BoundingBox3d3f";
     return (char*)type->chars;
 }
+const char *getPBJType(pPBJParser ctx, pANTLR3_STRING type) {
+    if (strcmp((char*)type->chars,"angle")==0) {
+        return "PBJ::angle";
+    }
+    if (strcmp((char*)type->chars,"string")==0) {
+        return "PBJ::utf8string";
+    }
+    if (strcmp((char*)type->chars,"bytes")==0) {
+        return "PBJ::bytes";
+    }
+    if (strcmp((char*)type->chars,"normal")==0) {
+        return "PBJ::normal";
+    }
+    return getCppType(ctx,type);
+
+}
 void printFlags(FILE *fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
     pANTLR3_STRING all_on =((pANTLR3_STRING)(flag_all_on->get(flag_all_on,name->chars)));
     if (all_on) {
@@ -480,6 +508,7 @@ void printFlags(FILE *fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isMultiplicitiveAdvancedType){
     const char * cppType=getCppType(ctx,type);
+    const char * pbjType=getPBJType(ctx,type);
     const char * protoType=getProtoType(ctx,type);
     int isEnum = SCOPE_TOP(Symbols)->enum_sizes->get(SCOPE_TOP(Symbols)->enum_sizes,type->chars)!=NULL;
     int isFlag = SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)!=NULL;
@@ -500,7 +529,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             }
             sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s(%s) const {\n",cppType,name->chars,isRepeated?"int index":"");
             sendTabs(ctx,2);fprintf(CPPFP,"if (has_%s(%s)) {\n",name->chars,isRepeated?"index":"");
-            sendTabs(ctx,3);fprintf(CPPFP,"return _PBJCast<%s>()(",cppType);
+            sendTabs(ctx,3);fprintf(CPPFP,"return _PBJCast< %s>()(",pbjType);
             for (i=0;i<numItemsPerElement;++i) {
                 if (isRepeated) {
                     fprintf(CPPFP,"super->%s(index*%d+%d)%s",name->chars,numItemsPerElement,i,i+1==numItemsPerElement?");\n":",");
@@ -513,27 +542,23 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
 
                 sendTabs(ctx,3);fprintf(CPPFP,"return %s(%s);",cppType,value->chars);
             }else {
-                sendTabs(ctx,3);fprintf(CPPFP,"return _PBJCast<%s>()();\n",cppType);
+                sendTabs(ctx,3);fprintf(CPPFP,"return _PBJCast< %s>()();\n",pbjType);
             }
             sendTabs(ctx,2);fprintf(CPPFP,"}\n");
             sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-            sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s_%s(const %s &value) {\n",isRepeated?"int":"void",isRepeated?"add":"set",name->chars,cppType);
+            sendTabs(ctx,1);fprintf(CPPFP,"inline void %s_%s(const %s &value) {\n",isRepeated?"add":"set",name->chars,cppType);
             if (!isRepeated){
                 sendTabs(ctx,2);fprintf(CPPFP,"super->clear_%s();\n",name->chars);
             }
-            sendTabs(ctx,2);fprintf(CPPFP,"int _retval;\n");
             for (i=0;i<numItemsPerElement;++i) {
-                sendTabs(ctx,2);fprintf(CPPFP,"_retval=super->add_%s(_PBJConstruct<%s,%d>()(value)[%d]);\n",name->chars,cppType,numItemsPerElement,i);
+                sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(_PBJConstruct< %s>()(value)[%d]);\n",name->chars,pbjType,i);
             }
-            if (isRepeated){
-                sendTabs(ctx,2);fprintf(CPPFP,"return _retval/%d\n",numItemsPerElement);
-            }            
             sendTabs(ctx,1);fprintf(CPPFP,"}\n");
 
             if (isRepeated) {
                 sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) {\n",name->chars,cppType);
                 for (i=0;i<numItemsPerElement;++i) {
-                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index*%d+%d,_PBJConstruct<%s,%d>()(value)[%d]);\n",name->chars,numItemsPerElement,i,cppType,numItemsPerElement,i);
+                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index*%d+%d,_PBJConstruct< %s>()(value)[%d]);\n",name->chars,numItemsPerElement,i,pbjType,i);
                 }
                 sendTabs(ctx,1);fprintf(CPPFP,"}\n");
             }
@@ -541,11 +566,11 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
 
     }else {
         //set or add
-        sendTabs(ctx,1);fprintf(CPPFP,"inline %s_%s(const %s &value) const {\n",isRepeated?"int add":"void set",name->chars,cppType);
+        sendTabs(ctx,1);fprintf(CPPFP,"inline void %s_%s(const %s &value) const {\n",isRepeated?"add":"set",name->chars,cppType);
         if (isMessageType) {
-            sendTabs(ctx,2);fprintf(CPPFP,"%ssuper->%s_%s(value->super);\n",isRepeated?"return ":"",isRepeated?"add":"set",name->chars);
+            sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s(value);\n",isRepeated?"add":"set",name->chars);
         }else {
-            sendTabs(ctx,2);fprintf(CPPFP,"%ssuper->%s_%s(_PBJConstruct<%s>()(value));\n",isRepeated?"return ":"",isRepeated?"add":"set",name->chars,cppType);
+            sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s(_PBJConstruct< %s>()(value));\n",isRepeated?"add":"set",name->chars,pbjType);
         }
         sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
 
@@ -555,39 +580,39 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,1);fprintf(CPPFP,"inline int %s_size() const {return super->%s_size();}\n",name->chars,name->chars);
 
                 if (strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0) {//strings and bytes have special setter functionality
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(int index, const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value);\n",name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const char *value) const {\n",name->chars);
+                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index,value);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline int add_%s(const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->add_%s(value);\n",name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline void add_%s(const char *value) const {\n",name->chars);
+                    sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(value);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     sendTabs(ctx,1);fprintf(CPPFP,"inline const ::std::string& %s(int index) const {\n",name->chars);
                     sendTabs(ctx,2);fprintf(CPPFP,"return super->%s(index);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");                    
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<size()); return true;}\n",name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<%s_size()); return true;}\n",name->chars,name->chars);
                     
                     if (strcmp((char*)type->chars,"bytes")==0) {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(int index, const void *value, size_t size) const {\n",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value,size);\n",name->chars);
+                        sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const void *value, size_t size) const {\n",name->chars);
+                        sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index,value,size);\n",name->chars);
                         sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline int add_%s(const void *value, size_t size) const {\n",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"return super->add_%s(value,size);\n",name->chars);
+                        sendTabs(ctx,1);fprintf(CPPFP,"inline void add_%s(const void *value, size_t size) const {\n",name->chars);
+                        sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(value,size);\n",name->chars);
                         sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     }
                 }else {
                     if (isMessageType) {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<size()); return true;}\n",name->chars,name->chars);
+                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<%s_size()); return true;}\n",name->chars,name->chars,name->chars);
                     }else if (isFlag) {
                         int i,numFlags=0;
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"assert(index>=0&&index<size();\n"); 
-                        sendTabs(ctx,2);fprintf(CPPFP,"return _PBJValidateFlags<%s>()(super->%s(index),",type->chars,name->chars);
+                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {",name->chars);
+                        sendTabs(ctx,2);fprintf(CPPFP,"assert(index>=0&&index<%s_size();\n",name->chars); 
+                        sendTabs(ctx,2);fprintf(CPPFP,"return _PBJValidateFlags< %s>()(super->%s(index),",pbjType,name->chars);
                         
                         printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
                         fprintf(CPPFP,");\n");
                         sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     }else {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {assert(index>=0&&index<size()); return _PBJValidate<%s>()(super->%s(index));}\n",name->chars,type->chars,name->chars);
+                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<%s_size()); return _PBJValidate<%s>()(super->%s(index));}\n",name->chars,name->chars,pbjType,name->chars);
                     }
                     sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s(int index) const {\n",cppType,name->chars);
                     if (value) {
@@ -596,11 +621,11 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     if (isMessageType) {
                         sendTabs(ctx,value?3:2);fprintf(CPPFP,"return %s(super->%s(index));\n",cppType,name->chars);//FIXME:cast
                     } else if (isFlag) {
-                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags<%s>(index)(super->%s(index),",cppType,name->chars);
+                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags< %s>(index)(super->%s(index),",pbjType,name->chars);
                         printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
                         fprintf(CPPFP,");\n",cppType,name->chars);
                     } else {
-                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCast<%s>()(super->%s(index));\n",cppType,name->chars);
+                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCast< %s>()(super->%s(index));\n",pbjType,name->chars);
                     }
                     if (value) {
                         sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
@@ -615,9 +640,9 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 }
                 sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) const {\n",name->chars,cppType);
                 if (isMessageType) {
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value->super);\n",name->chars);
+                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value);\n",name->chars);
                 }else {
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct<%s>()(value->super));\n",name->chars,cppType);
+                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct< %s>()(value));\n",name->chars,pbjType);
                 }
                 sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 
@@ -630,12 +655,12 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 }else if (isFlag) {
                     sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {\n",name->chars);
                     sendTabs(ctx,2);fprintf(CPPFP,"if (!super->has_%s()) return false;\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return _PBJValidateFlags<%s>()(super->%s(),",type->chars,name->chars);
+                    sendTabs(ctx,2);fprintf(CPPFP,"return _PBJValidateFlags< %s>()(super->%s(),",pbjType,name->chars);
                     printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);                    
                     fprintf(CPPFP,");\n");
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 }else {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {return super->has_%s()&&_PBJValidate<%s>()(super->%s());}\n",name->chars,name->chars,type->chars,name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {return super->has_%s()&&_PBJValidate<%s>()(super->%s());}\n",name->chars,name->chars,pbjType,name->chars);
                 }
                 sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s() const {\n",cppType,name->chars);
                 if (value) {
@@ -644,11 +669,11 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 if (isMessageType) {
                     sendTabs(ctx,value?3:2);fprintf(CPPFP,"return %s(super->%s());\n",cppType,name->chars);
                 } else if (isFlag) {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags<%s>()(super->%s(index),",cppType,name->chars);
+                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags< %s>()(super->%s(index),",pbjType,name->chars);
                     printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
                     fprintf(CPPFP,");\n",cppType,name->chars);
                 } else {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCast<%s>()(super->%s());\n",cppType,name->chars);
+                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCast< %s>()(super->%s());\n",pbjType,name->chars);
                 }
                 if (value) {
                     sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
@@ -661,13 +686,13 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 }
                 sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 if (strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0) {//strings and bytes have special setter functionality
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(value);\n",name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(const char *value) const {\n",name->chars);
+                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(value);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     
                     if (strcmp((char*)type->chars,"bytes")==0) {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline int set_%s(const void *value, size_t size) const {\n",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(value,size);\n",name->chars);
+                        sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(const void *value, size_t size) const {\n",name->chars);
+                        sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(value,size);\n",name->chars);
                         sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                     }
                 }
