@@ -28,6 +28,16 @@ typedef Sirikata::BoundingBox3f3f BoundingBox3f3f;
 typedef Sirikata::BoundingBox3d3f BoundingBox3d3f;
 typedef Sirikata::BoundingSphere3f BoundingSphere3f;
 typedef Sirikata::BoundingSphere3d BoundingSphere3d;
+
+typedef Sirikata::Array<float,2> Array2f;
+typedef Sirikata::Array<double,2> Array2d;
+typedef Sirikata::Array<float,3> Array3f;
+typedef Sirikata::Array<double,3> Array3d;
+typedef Sirikata::Array<float,4> Array4f;
+typedef Sirikata::Array<double,4> Array4d;
+typedef Sirikata::Array<float,6> Array6f;
+typedef Sirikata::Array<double,6> Array6d;
+
 class angle {};
 class normal :public Vector3f{public:normal(const Vector3f&v):Vector3f(v){}};
 class vector2f {};
@@ -90,6 +100,90 @@ public:
     }
 };
 
+template <> class _PBJConstruct<PBJ::Vector2f> {
+public:
+    PBJ::Array2f operator()(const PBJ::Vector2f&ct) {
+        float data[2]={ct.x,ct.y};
+        return PBJ::Array2f::construct(data);
+    }
+};
+template <> class _PBJConstruct<PBJ::Vector2d> {
+public:
+    PBJ::Array2d operator()(const PBJ::Vector2d&ct) {
+        double data[2]={ct.x,ct.y};
+        return PBJ::Array2d::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::Vector3f> {
+public:
+    PBJ::Array3f operator()(const PBJ::Vector3f&ct) {
+        float data[3]={ct.x,ct.y,ct.z};
+        return PBJ::Array3f::construct(data);
+    }
+};
+template <> class _PBJConstruct<PBJ::Vector3d> {
+public:
+    PBJ::Array3d operator()(const PBJ::Vector3d&ct) {
+        double data[3]={ct.x,ct.y,ct.z};
+        return PBJ::Array3d::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::Vector4f> {
+public:
+    PBJ::Array4f operator()(const PBJ::Vector4f&ct) {
+        float data[4]={ct.x,ct.y,ct.z,ct.w};
+        return PBJ::Array4f::construct(data);
+    }
+};
+template <> class _PBJConstruct<PBJ::Vector4d> {
+public:
+    PBJ::Array4d operator()(const PBJ::Vector4d&ct) {
+        double data[4]={ct.x,ct.y,ct.z,ct.w};
+        return PBJ::Array4d::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::BoundingSphere3f> {
+public:
+    PBJ::Array4f operator()(const PBJ::BoundingSphere3f&ct) {
+        float data[4]={ct.center().x,ct.center().y,ct.center().z,ct.radius()};
+        return PBJ::Array4f::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::BoundingSphere3d> {
+public:
+    PBJ::Array4d operator()(const PBJ::BoundingSphere3d&ct) {
+        double data[4]={ct.center().x,ct.center().y,ct.center().z,ct.radius()};
+        return PBJ::Array4d::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::Quaternion> {
+public:
+    PBJ::Array4f operator()(const PBJ::Quaternion&ct) {
+        float data[4]={ct.x,ct.y,ct.z,ct.w};
+        return PBJ::Array4f::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::BoundingBox3f3f> {
+public:
+    PBJ::Array6f operator()(const PBJ::BoundingBox3f3f&ct) {
+        float data[6]={ct.center().x,ct.center().y,ct.center().z,ct.across().x,ct.across().y,ct.across().z};
+        return PBJ::Array6f::construct(data);
+    }
+};
+
+template <> class _PBJConstruct<PBJ::BoundingBox3d3f> {
+public:
+    PBJ::Array6d operator()(const PBJ::BoundingBox3d3f&ct) {
+        double data[6]={ct.center().x,ct.center().y,ct.center().z,ct.across().x,ct.across().y,ct.across().z};
+        return PBJ::Array6d::construct(data);
+    }
+};
 
 
 template <typename convertTo> class _PBJCast {
@@ -228,6 +322,46 @@ public:
 };
 
 
+template <> class _PBJCast<PBJ::BoundingSphere3f> {
+public:
+    PBJ::BoundingSphere3f operator()(double x, double y, double z, float r) {
+        return PBJ::BoundingSphere3f(PBJ::Vector3f(x,y,z),r);
+    }
+    PBJ::BoundingSphere3f operator()() {
+        return PBJ::BoundingSphere3f(PBJ::Vector3f(0,0,0),0);
+    }
+};
+template <> class _PBJCast<PBJ::BoundingSphere3d> {
+public:
+    PBJ::BoundingSphere3d operator()(double x, double y, double z, float r) {
+        return PBJ::BoundingSphere3d(PBJ::Vector3d(x,y,z),r);
+    }
+    PBJ::BoundingSphere3d operator()() {
+        return PBJ::BoundingSphere3d(PBJ::Vector3d(0,0,0),0);
+    }
+};
+
+
+template <> class _PBJCast<PBJ::BoundingBox3f3f> {
+public:
+    PBJ::BoundingBox3f3f operator()(double x, double y, double z, float w, float h, float d) {
+        return PBJ::BoundingBox3f3f(PBJ::Vector3f(x,y,z),PBJ::Vector3f(x+w,y+h,z+d));
+    }
+    PBJ::BoundingBox3f3f operator()() {
+        return PBJ::BoundingBox3f3f(PBJ::Vector3f(0,0,0),PBJ::Vector3f(0,0,0));
+    }
+};
+template <> class _PBJCast<PBJ::BoundingBox3d3f> {
+public:
+    PBJ::BoundingBox3d3f operator()(double x, double y, double z, double w, double h, double d) {
+        return PBJ::BoundingBox3d3f(PBJ::Vector3d(x,y,z),PBJ::Vector3d(x+w,y+h,z+d));
+    }
+    PBJ::BoundingBox3d3f operator()() {
+        return PBJ::BoundingBox3d3f(PBJ::Vector3d(0,0,0),0);
+    }
+};
+
+
 
 
 template <typename Type> class _PBJValidate {
@@ -246,5 +380,17 @@ template <> class _PBJValidate<PBJ::angle> {
 public:
     bool operator()(const float&ct) {
         return ct>=0&&ct<=2*3.1415926536;
+    }
+};
+template <typename Type> class _PBJValidateFlags {
+public:
+    bool operator() (Type input, Type allFlagsOn) {
+        return (input|allFlagsOn)==allFlagsOn;
+    }
+};
+template <typename Type> class _PBJCastFlags {
+public:
+    Type operator() (Type input, Type allFlagsOn) {
+        return input&allFlagsOn;
     }
 };

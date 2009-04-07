@@ -247,6 +247,8 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,1);
         fprintf(CPPFP,"class %s : protected _PBJ_Internal::%s {\n",id->chars,id->chars);
         sendTabs(ctx,2);
+        fprintf(CPPFP,"protected:\n");
+        sendTabs(ctx,2);
         fprintf(CPPFP,"_PBJ_Internal::%s *super;\n",id->chars);
         sendTabs(ctx,1);
         fprintf(CPPFP,"public:\n");
@@ -669,7 +671,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 if (isMessageType) {
                     sendTabs(ctx,value?3:2);fprintf(CPPFP,"return %s(super->%s());\n",cppType,name->chars);
                 } else if (isFlag) {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags< %s>()(super->%s(index),",pbjType,name->chars);
+                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags< %s>()(super->%s(),",pbjType,name->chars);
                     printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
                     fprintf(CPPFP,");\n",cppType,name->chars);
                 } else {
@@ -704,6 +706,7 @@ void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumV
     int enumSize=enumValues->size(enumValues);
     int i;
     sendTabs(ctx,1);
+/*
     fprintf(CPPFP,"enum %s {\n",id->chars);
     for (i=0;i<enumSize;i+=2) {
         pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
@@ -716,6 +719,7 @@ void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumV
     }
     sendTabs(ctx,1);
     fprintf(CPPFP,"};\n");
+*/
 }
 void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
     int i,*maxval=(int*)malloc(sizeof(int));
