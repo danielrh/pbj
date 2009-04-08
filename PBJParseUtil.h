@@ -10,7 +10,9 @@
 #define SCOPE_STACK(scope)  pPBJParser_##scope##Stack
 #define	SCOPE_TOP(scope)    ctx->pPBJParser_##scope##Top
 //#define	SCOPE_SIZE(scope)			(ctx->SCOPE_STACK(scope)->size(ctx->SCOPE_STACK(scope)))
+#ifndef SCOPE_SIZE
 #define	SCOPE_SIZE(scope) ctx->pPBJParser_##scope##Stack_limit
+#endif
 #define SCOPE_INSTANCE(scope, i)	(ctx->SCOPE_STACK(scope)->get(ctx->SCOPE_STACK(scope),i))
 typedef struct LanguageOutputStruct {
     FILE * cpp;

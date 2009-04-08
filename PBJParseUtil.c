@@ -216,7 +216,7 @@ static void openNamespace(pPBJParser ctx) {
     }
 }
 static void closeNamespace(pPBJParser ctx) {
-    if (SCOPE_TOP(NameSpace)->package&&SCOPE_SIZE(Symbols)<2) {
+    if (SCOPE_TOP(NameSpace)->package&&SCOPE_SIZE(Symbols)<=2) {
         size_t stringSize=SCOPE_TOP(NameSpace)->package->size;
         size_t i;
         if (SCOPE_TOP(NameSpace)->output->cpp) {
@@ -577,7 +577,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
     }else {
         //set or add
         if (isMessageType) {
-            sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s_%s() const {\n",cppType,isRepeated?"add":"mutable",name->chars);
+            sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s_%s() {\n",cppType,isRepeated?"add":"mutable",name->chars);
             sendTabs(ctx,2);fprintf(CPPFP,"return *super->%s_%s();\n",isRepeated?"add":"mutable",name->chars);
             sendTabs(ctx,1);fprintf(CPPFP,"}\n");
         }else {
@@ -656,7 +656,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 }
                 if (isMessageType) {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline %s set_%s(int index) const {\n",cppType,name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline %s set_%s(int index) {\n",cppType,name->chars);
                     sendTabs(ctx,2);fprintf(CPPFP,"return *super->mutable_%s(index);\n",name->chars);
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 }else {

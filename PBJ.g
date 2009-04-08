@@ -71,11 +71,8 @@ message
     }
     :   ( message_or_extend message_identifier BLOCK_OPEN message_elements BLOCK_CLOSE -> message_or_extend WS[" "] message_identifier WS[" "] BLOCK_OPEN WS["\n"] message_elements BLOCK_CLOSE WS["\n"] )
         {
-            if($message::isExtension) {
-                defineExtensionEnd(ctx, $message::messageName);
-            }else {
+            if(!$message::isExtension) {
                 defineType( ctx, $message::messageName );
-                defineMessageEnd(ctx, $message::messageName);
             }
             stringFree($message::messageName);
         }
@@ -107,7 +104,11 @@ message_elements
     }
 	:	message_element*
     {
-
+        if($message::isExtension) {
+            defineExtensionEnd(ctx, $message::messageName);
+        }else {
+            defineMessageEnd(ctx, $message::messageName);
+        }
     }
     ;
 
