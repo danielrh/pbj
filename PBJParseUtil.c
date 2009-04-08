@@ -44,7 +44,7 @@ void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     symtab->free=freeNameSpace;
     
 }
-void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName) {
+void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, int isExtension) {
     symtab->message=NULL;
     symtab->types = antlr3HashTableNew(11);
     symtab->flag_all_on = antlr3HashTableNew(11);
@@ -52,7 +52,7 @@ void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName) {
     symtab->enum_sizes = antlr3HashTableNew(11);
     symtab->flag_values = antlr3HashTableNew(11);
     symtab->enum_values = antlr3HashTableNew(11);
-    if (messageName&&symtab->message==NULL) {
+    if (messageName&&symtab->message==NULL&&!isExtension) {
         symtab->message=stringDup(messageName);
     }
     symtab->free = freeSymbolTable;
@@ -188,7 +188,7 @@ static char* stringChar(pANTLR3_STRING str, ANTLR3_UINT8 searchme) {
 static void openNamespace(pPBJParser ctx) {
     pANTLR3_STRING substr;
     pANTLR3_STRING rest=NULL;
-    if (SCOPE_TOP(NameSpace)->package) {
+    if (SCOPE_TOP(NameSpace)->package&&SCOPE_SIZE(Symbols)<2) {
         char *where=stringChar(SCOPE_TOP(NameSpace)->package,'.');
         if (where) {
             substr=SCOPE_TOP(NameSpace)->package->subString(SCOPE_TOP(NameSpace)->package,0,where-(char*)SCOPE_TOP(NameSpace)->package->chars);
@@ -216,7 +216,7 @@ static void openNamespace(pPBJParser ctx) {
     }
 }
 static void closeNamespace(pPBJParser ctx) {
-    if (SCOPE_TOP(NameSpace)->package) {
+    if (SCOPE_TOP(NameSpace)->package&&SCOPE_SIZE(Symbols)<2) {
         size_t stringSize=SCOPE_TOP(NameSpace)->package->size;
         size_t i;
         if (SCOPE_TOP(NameSpace)->output->cpp) {
@@ -240,16 +240,30 @@ static void sendTabs(pPBJParser ctx,int offset) {
         fprintf(CPPFP,"    ");
     }
 }
+
+static void sendCppMessageLevels(pPBJParser ctx, FILE *fp) {
+    int i;
+    for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
+        if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
+            fprintf(fp,"%s::",((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message->chars);
+        }
+    }
+}
+
 void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
     if (CPPFP) {
         SCOPE_TOP(Symbols)->message=stringDup(id);
         sendTabs(ctx,1);
-        fprintf(CPPFP,"class %s : protected _PBJ_Internal::%s {\n",id->chars,id->chars);
+        fprintf(CPPFP,"class %s : protected _PBJ_Internal::",id->chars);
+        sendCppMessageLevels(ctx,CPPFP);
+        fprintf(CPPFP,"%s {\n",id->chars);
         sendTabs(ctx,2);
         fprintf(CPPFP,"protected:\n");
         sendTabs(ctx,2);
-        fprintf(CPPFP,"_PBJ_Internal::%s *super;\n",id->chars);
+        fprintf(CPPFP,"_PBJ_Internal::");
+        sendCppMessageLevels(ctx,CPPFP);
+        fprintf(CPPFP,"%s *super;\n",id->chars);
         sendTabs(ctx,1);
         fprintf(CPPFP,"public:\n");
         sendTabs(ctx,2);
@@ -259,9 +273,22 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,2);
         fprintf(CPPFP,"}\n");
         sendTabs(ctx,2);
-        fprintf(CPPFP,"%s(_PBJ_Internal::%s&reference) {\n",id->chars,id->chars);
+        fprintf(CPPFP,"%s(_PBJ_Internal::",id->chars);
+        sendCppMessageLevels(ctx,CPPFP);
+        fprintf(CPPFP,"%s &reference) {\n",id->chars);
         sendTabs(ctx,3);
         fprintf(CPPFP,"super=&reference;\n");
+        sendTabs(ctx,2);
+        fprintf(CPPFP,"}\n",id->chars);
+
+        sendTabs(ctx,2);
+        fprintf(CPPFP,"%s(const _PBJ_Internal::",id->chars);
+        sendCppMessageLevels(ctx,CPPFP);
+        fprintf(CPPFP,"%s &copy) {\n",id->chars);
+        sendTabs(ctx,3);
+        fprintf(CPPFP,"super=this;\n");
+        sendTabs(ctx,3);
+        fprintf(CPPFP,"*super=copy;\n");
         sendTabs(ctx,2);
         fprintf(CPPFP,"}\n",id->chars);
         
@@ -269,35 +296,11 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
 }
 void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
-    if (CPPFP) {
+    if (CPPFP&&0) {
         sendTabs(ctx,1);
         fprintf(CPPFP,"class %sExtend : public %s {\n",id->chars,id->chars);
         sendTabs(ctx,1);
         fprintf(CPPFP,"public:\n",id->chars,id->chars);
-    }
-}
-const char *preValidator(FILE*fp, pANTLR3_STRING type, const char* cppType, const char* protoType, const char* defaultName, int returnValid) {
-    if (strcmp((char*)type->chars,"uuid")==0)
-        fprintf(fp, "try {return PBJ::UUID(");
-    else if (strcmp((char*)type->chars,"time")==0||strcmp((char*)type->chars,"duration")==0) {
-        if (returnValid)
-            fprintf(fp,"return (");
-        else
-            fprintf(fp,"return %s::microseconds(",cppType);
-    }else {
-        fprintf(fp,"return (");
-    }
-}
-void postValidator(FILE*fp, pANTLR3_STRING type, const char* cppType, const char* protoType, const char* defaultName, int returnValid) {
-    if (strcmp((char*)type->chars,"uuid")==0)
-        fprintf(fp,
-                ",PBJ::HumanReadable())%s;}catch(std::invalid_arguments& ia){return %s;}",
-                returnValid?",true":"",
-                returnValid?(defaultName?defaultName:"UUID::null()"):"false");
-    else if (strcmp((char*)type->chars,"time")==0||strcmp((char*)type->chars,"duration")==0) {
-        fprintf(fp,"%s);",returnValid?",true":"");
-    } else {
-        fprintf(fp,"%s);",returnValid?",true":"");
     }
 }
 const char *getProtoType(pPBJParser ctx, pANTLR3_STRING type) {
@@ -509,6 +512,10 @@ void printFlags(FILE *fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
     }
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isMultiplicitiveAdvancedType){
+    if (SCOPE_TOP(Symbols)->message==NULL) {
+        fprintf(CPPFP,"using _PBJ_Internal::%s;\n",name->chars);
+        return;
+    }
     const char * cppType=getCppType(ctx,type);
     const char * pbjType=getPBJType(ctx,type);
     const char * protoType=getProtoType(ctx,type);
@@ -552,8 +559,9 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             if (!isRepeated){
                 sendTabs(ctx,2);fprintf(CPPFP,"super->clear_%s();\n",name->chars);
             }
+            sendTabs(ctx,2);fprintf(CPPFP,"_PBJConstruct< %s>::ArrayType _PBJtempArray=_PBJConstruct< %s>()(value);\n",pbjType,pbjType);
             for (i=0;i<numItemsPerElement;++i) {
-                sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(_PBJConstruct< %s>()(value)[%d]);\n",name->chars,pbjType,i);
+                sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(_PBJtempArray[%d]);\n",name->chars,i);
             }
             sendTabs(ctx,1);fprintf(CPPFP,"}\n");
 
@@ -568,14 +576,21 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
 
     }else {
         //set or add
-        sendTabs(ctx,1);fprintf(CPPFP,"inline void %s_%s(const %s &value) const {\n",isRepeated?"add":"set",name->chars,cppType);
         if (isMessageType) {
-            sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s(value);\n",isRepeated?"add":"set",name->chars);
+            sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s_%s() const {\n",cppType,isRepeated?"add":"mutable",name->chars);
+            sendTabs(ctx,2);fprintf(CPPFP,"return *super->%s_%s();\n",isRepeated?"add":"mutable",name->chars);
+            sendTabs(ctx,1);fprintf(CPPFP,"}\n");
         }else {
-            sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s(_PBJConstruct< %s>()(value));\n",isRepeated?"add":"set",name->chars,pbjType);
+            sendTabs(ctx,1);fprintf(CPPFP,"inline void %s_%s(const %s &value) const {\n",isRepeated?"add":"set",name->chars,cppType);
+            if (isEnum) {
+                sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s((_PBJ_Internal::",isRepeated?"add":"set",name->chars);
+                sendCppMessageLevels(ctx,CPPFP);
+                fprintf(CPPFP,"%s::%s)value);\n",SCOPE_TOP(Symbols)->message->chars,type->chars);
+            }else {
+                sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s(_PBJConstruct< %s>()(value));\n",isRepeated?"add":"set",name->chars,pbjType);
+            }
+            sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
         }
-        sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
-
         if (isRepeated) {
             if (CPPFP) {
                 
@@ -627,7 +642,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                         printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
                         fprintf(CPPFP,");\n",cppType,name->chars);
                     } else {
-                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCast< %s>()(super->%s(index));\n",pbjType,name->chars);
+                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return (%s)_PBJCast< %s>()(super->%s(index));\n",cppType,pbjType,name->chars);
                     }
                     if (value) {
                         sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
@@ -640,13 +655,21 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     }
                     sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 }
-                sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) const {\n",name->chars,cppType);
                 if (isMessageType) {
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,value);\n",name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline %s set_%s(int index) const {\n",cppType,name->chars);
+                    sendTabs(ctx,2);fprintf(CPPFP,"return *super->mutable_%s(index);\n",name->chars);
+                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 }else {
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct< %s>()(value));\n",name->chars,pbjType);
+                    sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) const {\n",name->chars,cppType);
+                    if (isEnum) {
+                        sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,(_PBJ_Internal::",name->chars);
+                        sendCppMessageLevels(ctx,CPPFP);
+                        fprintf(CPPFP,"%s::%s)(value));\n",SCOPE_TOP(Symbols)->message->chars,type->chars);
+                    }else {
+                        sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct< %s>()(value));\n",name->chars,pbjType);
+                    }
+                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
                 }
-                sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 
             }
             
@@ -675,7 +698,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
                     fprintf(CPPFP,");\n",cppType,name->chars);
                 } else {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCast< %s>()(super->%s());\n",pbjType,name->chars);
+                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return (%s)_PBJCast< %s>()(super->%s());\n",cppType,pbjType,name->chars);
                 }
                 if (value) {
                     sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
@@ -705,21 +728,22 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
 void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
     int enumSize=enumValues->size(enumValues);
     int i;
-    sendTabs(ctx,1);
-/*
-    fprintf(CPPFP,"enum %s {\n",id->chars);
-    for (i=0;i<enumSize;i+=2) {
-        pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"%s=_PBJ_Internal::%s::%s%s",
-                enumVal->chars,
-                SCOPE_TOP(Symbols)->message->chars,
-                enumVal->chars,
-                (i+2==enumSize?"\n":",\n"));            
+    if (CPPFP){
+        sendTabs(ctx,1);
+        
+        fprintf(CPPFP,"enum %s {\n",id->chars);
+        for (i=0;i<enumSize;i+=2) {
+            pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
+            sendTabs(ctx,2);
+            fprintf(CPPFP,"%s=_PBJ_Internal::%s::%s%s",
+                    enumVal->chars,
+                    SCOPE_TOP(Symbols)->message->chars,
+                    enumVal->chars,
+                    (i+2==enumSize?"\n":",\n"));            
+        }
+        sendTabs(ctx,1);
+        fprintf(CPPFP,"};\n");
     }
-    sendTabs(ctx,1);
-    fprintf(CPPFP,"};\n");
-*/
 }
 void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
     int i,*maxval=(int*)malloc(sizeof(int));
@@ -788,7 +812,7 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
 }
 
 void defineExtensionEnd(pPBJParser ctx, pANTLR3_STRING id){
-    if (CPPFP) {
+    if (CPPFP&&0) {
         sendTabs(ctx,0);
         fprintf(CPPFP,"};\n");
     }

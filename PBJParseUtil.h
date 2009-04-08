@@ -9,14 +9,15 @@
 #define	SCOPE_TYPE(scope)   pPBJParser_##scope##_SCOPE
 #define SCOPE_STACK(scope)  pPBJParser_##scope##Stack
 #define	SCOPE_TOP(scope)    ctx->pPBJParser_##scope##Top
-#define	SCOPE_SIZE(scope)			(ctx->SCOPE_STACK(scope)->size(ctx->SCOPE_STACK(scope)))
+//#define	SCOPE_SIZE(scope)			(ctx->SCOPE_STACK(scope)->size(ctx->SCOPE_STACK(scope)))
+#define	SCOPE_SIZE(scope) ctx->pPBJParser_##scope##Stack_limit
 #define SCOPE_INSTANCE(scope, i)	(ctx->SCOPE_STACK(scope)->get(ctx->SCOPE_STACK(scope),i))
 typedef struct LanguageOutputStruct {
     FILE * cpp;
     FILE * cs;
 } LanguageOutput;
 
-void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING msgId);
+void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING msgId, int isExtension);
 void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab);
 
 void definePackage(pPBJParser ctx, pANTLR3_STRING id);

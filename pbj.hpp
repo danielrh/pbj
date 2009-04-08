@@ -102,6 +102,7 @@ public:
 
 template <> class _PBJConstruct<PBJ::Vector2f> {
 public:
+    typedef PBJ::Array2f ArrayType;
     PBJ::Array2f operator()(const PBJ::Vector2f&ct) {
         float data[2]={ct.x,ct.y};
         return PBJ::Array2f::construct(data);
@@ -109,14 +110,26 @@ public:
 };
 template <> class _PBJConstruct<PBJ::Vector2d> {
 public:
+    typedef PBJ::Array2d ArrayType;
     PBJ::Array2d operator()(const PBJ::Vector2d&ct) {
         double data[2]={ct.x,ct.y};
         return PBJ::Array2d::construct(data);
     }
 };
 
+template <> class _PBJConstruct<PBJ::normal> {
+public:
+    typedef PBJ::Array2f ArrayType;
+    PBJ::Array2f operator()(const PBJ::Vector3f&n) {
+        PBJ::Vector3f ct=n/n.length();
+        float data[2]={ct.x+(ct.z<0.0f?3.0f:0.0f),ct.y};
+        return PBJ::Array2f::construct(data);
+    }
+};
+
 template <> class _PBJConstruct<PBJ::Vector3f> {
 public:
+    typedef PBJ::Array3f ArrayType;
     PBJ::Array3f operator()(const PBJ::Vector3f&ct) {
         float data[3]={ct.x,ct.y,ct.z};
         return PBJ::Array3f::construct(data);
@@ -124,6 +137,7 @@ public:
 };
 template <> class _PBJConstruct<PBJ::Vector3d> {
 public:
+    typedef PBJ::Array3d ArrayType;
     PBJ::Array3d operator()(const PBJ::Vector3d&ct) {
         double data[3]={ct.x,ct.y,ct.z};
         return PBJ::Array3d::construct(data);
@@ -132,6 +146,7 @@ public:
 
 template <> class _PBJConstruct<PBJ::Vector4f> {
 public:
+    typedef PBJ::Array4f ArrayType;
     PBJ::Array4f operator()(const PBJ::Vector4f&ct) {
         float data[4]={ct.x,ct.y,ct.z,ct.w};
         return PBJ::Array4f::construct(data);
@@ -139,6 +154,7 @@ public:
 };
 template <> class _PBJConstruct<PBJ::Vector4d> {
 public:
+    typedef PBJ::Array4d ArrayType;
     PBJ::Array4d operator()(const PBJ::Vector4d&ct) {
         double data[4]={ct.x,ct.y,ct.z,ct.w};
         return PBJ::Array4d::construct(data);
@@ -147,6 +163,7 @@ public:
 
 template <> class _PBJConstruct<PBJ::BoundingSphere3f> {
 public:
+    typedef PBJ::Array4f ArrayType;
     PBJ::Array4f operator()(const PBJ::BoundingSphere3f&ct) {
         float data[4]={ct.center().x,ct.center().y,ct.center().z,ct.radius()};
         return PBJ::Array4f::construct(data);
@@ -155,6 +172,7 @@ public:
 
 template <> class _PBJConstruct<PBJ::BoundingSphere3d> {
 public:
+    typedef PBJ::Array4d ArrayType;
     PBJ::Array4d operator()(const PBJ::BoundingSphere3d&ct) {
         double data[4]={ct.center().x,ct.center().y,ct.center().z,ct.radius()};
         return PBJ::Array4d::construct(data);
@@ -163,14 +181,18 @@ public:
 
 template <> class _PBJConstruct<PBJ::Quaternion> {
 public:
-    PBJ::Array4f operator()(const PBJ::Quaternion&ct) {
-        float data[4]={ct.x,ct.y,ct.z,ct.w};
-        return PBJ::Array4f::construct(data);
+    typedef PBJ::Array3f ArrayType;
+    PBJ::Array3f operator()(const PBJ::Quaternion&q) {
+        PBJ::Quaternion ct=q/q.length();
+        
+        float data[3]={ct.x+(ct.w<0?3.0:0.0),ct.y,ct.z};
+        return PBJ::Array3f::construct(data);
     }
 };
 
 template <> class _PBJConstruct<PBJ::BoundingBox3f3f> {
 public:
+    typedef PBJ::Array6f ArrayType;
     PBJ::Array6f operator()(const PBJ::BoundingBox3f3f&ct) {
         float data[6]={ct.center().x,ct.center().y,ct.center().z,ct.across().x,ct.across().y,ct.across().z};
         return PBJ::Array6f::construct(data);
@@ -179,6 +201,7 @@ public:
 
 template <> class _PBJConstruct<PBJ::BoundingBox3d3f> {
 public:
+    typedef PBJ::Array6d ArrayType;
     PBJ::Array6d operator()(const PBJ::BoundingBox3d3f&ct) {
         double data[6]={ct.center().x,ct.center().y,ct.center().z,ct.across().x,ct.across().y,ct.across().z};
         return PBJ::Array6d::construct(data);
@@ -188,7 +211,7 @@ public:
 
 template <typename convertTo> class _PBJCast {
 public:
-    const convertTo& operator()(const convertTo&ct) {
+    template <typename Type> const Type& operator()(const Type&ct) {
         return ct;
     }
     convertTo operator()() {

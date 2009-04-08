@@ -35,7 +35,7 @@ scope Symbols {
 protocol
     scope Symbols;
     @init {
-        initSymbolTable(SCOPE_TOP(Symbols),NULL);
+        initSymbolTable(SCOPE_TOP(Symbols),NULL,0);
     }
     : protoroot ->protoroot
     ;
@@ -103,7 +103,7 @@ message_elements
     scope Symbols;
     @init
     {
-        initSymbolTable(SCOPE_TOP(Symbols), $message::messageName);  
+        initSymbolTable(SCOPE_TOP(Symbols), $message::messageName, $message::isExtension);  
     }
 	:	message_element*
     {
