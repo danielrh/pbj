@@ -1,6 +1,8 @@
 #ifndef _PBJ_PARSE_UTIL_H_
 #define _PBJ_PARSE_UTIL_H_
- 
+#ifdef __cplusplus
+extern "C" {
+#endif 
 #undef	SCOPE_TYPE
 #undef	SCOPE_STACK
 #undef	SCOPE_TOP
@@ -40,9 +42,12 @@ void NameSpacePop(pPBJParser ctx);
 
 
 void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab);
-void stringFree(void *s);
+void ANTLR3_CDECL stringFree(void *s);
 void grammarToString(pANTLR3_TREE_NODE_STREAM node_stream, pANTLR3_BASE_TREE base, pANTLR3_BASE_TREE stop, pANTLR3_STRING bufOutput);
-pANTLR3_STRING stringDup(pANTLR3_STRING s);
+pANTLR3_STRING ANTLR3_CDECL stringDup(pANTLR3_STRING s);
 pANTLR3_STRING defaultValuePreprocess(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING value);
 ANTLR3_BOOLEAN isTypeName(pPBJParser ctx, pANTLR3_UINT8 name);
+#ifdef __cplusplus
+}
+#endif 
 #endif //_PBJ_PARSE_UTIL_H_

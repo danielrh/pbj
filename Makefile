@@ -20,8 +20,8 @@ PBJLexer.o : PBJLexer.h PBJLexer.c
 PBJParser.o : PBJParser.h PBJParser.c
 	gcc -c -g2 -Iantlr-3.1.2/include -I/usr/local/include -o PBJParser.o PBJParser.c
 
-PBJParseUtil.o : PBJParseUtil.h PBJParseUtil.c
-	gcc -c -g2 -Iantlr-3.1.2/include -I/usr/local/include -o PBJParseUtil.o PBJParseUtil.c
+PBJParseUtil.o : PBJParseUtil.h PBJParseUtil.cpp
+	g++ -c -g2 -Iantlr-3.1.2/include -I/usr/local/include -o PBJParseUtil.o PBJParseUtil.cpp
 
 clean:
 	rm -f PBJParseUtil.o PBJLexer.o PBJParser.o PBJLexer.c PBJParser.c main.o

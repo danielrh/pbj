@@ -2,7 +2,7 @@
 #include "PBJ.h"
 #include "PBJParseUtil.h"
 #include <assert.h>
-void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
+void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->types->free(symtab->types);
     symtab->flag_sizes->free(symtab->flag_sizes);
     symtab->enum_sizes->free(symtab->enum_sizes);
@@ -13,11 +13,11 @@ void ANTLR3_CDECL freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
         stringFree(symtab->message);
     }
 }
-void ANTLR3_CDECL freeNameSpace(SCOPE_TYPE(NameSpace) symtab) {
+void  freeNameSpace(SCOPE_TYPE(NameSpace) symtab) {
     symtab->imports->free(symtab->imports);
     fclose(symtab->output->cpp);
 }
-void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
+void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     if (SCOPE_SIZE(NameSpace)>1) {
         SCOPE_TYPE(NameSpace) lowerNamespace;
         int scope_size=SCOPE_SIZE(NameSpace)-2;
@@ -44,7 +44,7 @@ void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     symtab->free=freeNameSpace;
     
 }
-void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, int isExtension) {
+void  initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, int isExtension) {
     symtab->message=NULL;
     symtab->types = antlr3HashTableNew(11);
     symtab->flag_all_on = antlr3HashTableNew(11);
@@ -58,18 +58,18 @@ void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, int
     symtab->free = freeSymbolTable;
 }
 
-void definePackage(pPBJParser ctx, pANTLR3_STRING id) {    
+void  definePackage(pPBJParser ctx, pANTLR3_STRING id) {    
     
     SCOPE_TOP(NameSpace)->package=stringDup(id);
 
 }
 
-pANTLR3_STRING stringDup(pANTLR3_STRING s) {
+pANTLR3_STRING  stringDup(pANTLR3_STRING s) {
     pANTLR3_STRING retval=s->factory->newPtr(s->factory,s->chars,s->len);
     return retval;
 }
 
-void stringFree(void* s) {
+void  stringFree(void* s) {
     pANTLR3_STRING id=(pANTLR3_STRING)s;
     if (id) {
         id->factory->destroy(id->factory,id);
@@ -180,7 +180,7 @@ static char* stringChar(pANTLR3_STRING str, ANTLR3_UINT8 searchme) {
     int i;
     for (i=0;i<str->len;++i) {
         if (str->chars[i]==searchme) {
-            return &str->chars[i];
+            return (char*)&str->chars[i];
         }
     }
     return NULL;
@@ -305,7 +305,7 @@ void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
 }
 const char *getProtoType(pPBJParser ctx, pANTLR3_STRING type) {
     int *flagBits=NULL;
-    if (flagBits=SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
+    if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
         if (*flagBits>64){
             fprintf(stderr, "Error bitflag %d too high on enum %s\n",*flagBits,type->chars);
         }
@@ -395,7 +395,7 @@ int getNumItemsPerElement(pPBJParser ctx, pANTLR3_STRING type) {
 }
 const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
     int *flagBits=NULL;
-    if (flagBits=SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
+    if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
         if (*flagBits>32) {
             return "PBJ::uint64";
         }
@@ -819,7 +819,7 @@ void defineExtensionEnd(pPBJParser ctx, pANTLR3_STRING id){
     closeNamespace(ctx);
 }
     
-void ANTLR3_CDECL NameSpaceFree(pPBJParser_NameSpace_SCOPE scope)
+void  NameSpaceFree(pPBJParser_NameSpace_SCOPE scope)
 {
     ANTLR3_FREE(scope);
 }
