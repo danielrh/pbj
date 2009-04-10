@@ -16,10 +16,8 @@ extern "C" {
 #define	SCOPE_SIZE(scope) ctx->pPBJParser_##scope##Stack_limit
 #endif
 #define SCOPE_INSTANCE(scope, i)	(ctx->SCOPE_STACK(scope)->get(ctx->SCOPE_STACK(scope),i))
-typedef struct LanguageOutputStruct {
-    FILE * cpp;
-    FILE * cs;
-} LanguageOutput;
+typedef struct LanguageOutputStruct LanguageOutput;
+typedef struct CsStreams CsStreamOutput;
 
 void initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING msgId, int isExtension);
 void initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab);

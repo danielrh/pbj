@@ -2,6 +2,9 @@
 #include "PBJ.h"
 #include "PBJParseUtil.h"
 #include <assert.h>
+#include <sstream>
+#include <iostream>
+#include "PBJLanguageOutput.hpp"
 void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->types->free(symtab->types);
     symtab->flag_sizes->free(symtab->flag_sizes);
@@ -12,10 +15,13 @@ void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     if (symtab->message) {
         stringFree(symtab->message);
     }
+    free(symtab->cs_streams);
+    symtab->cs_streams=NULL;
+       
 }
 void  freeNameSpace(SCOPE_TYPE(NameSpace) symtab) {
     symtab->imports->free(symtab->imports);
-    fclose(symtab->output->cpp);
+    delete symtab->output->cpp;    
 }
 void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     if (SCOPE_SIZE(NameSpace)>1) {
@@ -26,17 +32,23 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
         symtab->output=(struct LanguageOutputStruct*)malloc(sizeof(struct LanguageOutputStruct));
         memcpy(symtab->output,((SCOPE_TYPE(NameSpace) )SCOPE_INSTANCE(NameSpace,SCOPE_SIZE(NameSpace)-2))->output,sizeof(struct LanguageOutputStruct));
     }
-    if (symtab->output->cpp) {
+    if (symtab->output->cpp||symtab->output->cs) {
         char lst;
         if (symtab->filename->len>6) {
             lst=symtab->filename->chars[symtab->filename->len-6];
             assert(lst=='.');
             symtab->filename->chars[symtab->filename->len-6]='\0';
         }
-        fprintf(symtab->output->cpp,"#include \"pbj.hpp\"\n",symtab->filename->chars);
-        fprintf(symtab->output->cpp,"#include \"%s.pb.h\"\n",symtab->filename->chars);
+        if (symtab->output->cpp) {
+            *symtab->output->cpp<<"#include \"pbj.hpp\"\n";
+            *symtab->output->cpp<<"#include \""<<symtab->filename->chars<<".pb.h\"\n";
+        }
         if (symtab->filename->len>6) {
             symtab->filename->chars[symtab->filename->len-6]=lst;
+        }
+        if (symtab->output->cs) {
+            *symtab->output->cs<<"using converters = global::PBJ.Converters\n";
+            *symtab->output->cs<<"using pbd = global::Google.ProtocolBuffers.Descriptors;\n";
         }
     }
     symtab->package=NULL;
@@ -45,6 +57,9 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     
 }
 void  initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, int isExtension) {
+    symtab->cs_streams=(struct CsStreams*)malloc(sizeof(struct CsStreams));
+    memset(&symtab->cs_streams,0,sizeof(struct CsStreams));
+    symtab->cs_streams=NULL;
     symtab->message=NULL;
     symtab->types = antlr3HashTableNew(11);
     symtab->flag_all_on = antlr3HashTableNew(11);
@@ -76,7 +91,11 @@ void  stringFree(void* s) {
     }
 }
 
-#define CPPFP SCOPE_TOP(NameSpace)->output->cpp 
+#define CPPFP *SCOPE_TOP(NameSpace)->output->cpp 
+#define CSFP *SCOPE_TOP(NameSpace)->output->cs
+#define CSTYPE *SCOPE_TOP(Symbols)->cs_streams->csType
+#define CSBUILD *SCOPE_TOP(Symbols)->cs_streams->csBuild
+#define CSMEM *SCOPE_TOP(Symbols)->cs_streams->csMembers
 void defineImport(pPBJParser ctx, pANTLR3_STRING filename) {
 
     pANTLR3_STRING s=filename->factory->newRaw(filename->factory);
@@ -89,7 +108,7 @@ void defineImport(pPBJParser ctx, pANTLR3_STRING filename) {
             assert(lst=='.');
             s->chars[s->len-6]='\0';
         }
-        fprintf(CPPFP,"#include \"%s.pbj.hpp\"\n",s->chars);
+        CPPFP<<"#include \""<<s->chars<<".pbj.hpp\"\n";
         if (s->len>6)
             s->chars[s->len-6]=lst;
     }
@@ -196,8 +215,15 @@ static void openNamespace(pPBJParser ctx) {
         }else {
             substr=stringDup(SCOPE_TOP(NameSpace)->package);
         }
+        if (CSFP)
+            CSFP<<"namespace ";
+
         do {
-            fprintf(SCOPE_TOP(NameSpace)->output->cpp,"namespace %s {\n",substr->chars);
+            if (CPPFP)
+                CPPFP<<"namespace "<<substr->chars<<" {\n";
+            if (CSFP)
+                CSFP<<"namespace "<<substr->chars;
+
             stringFree(substr);
             substr=NULL;
             if (rest) {
@@ -212,6 +238,11 @@ static void openNamespace(pPBJParser ctx) {
                     rest=NULL;
                 }
             }
+            if (substr&&CSFP) {
+                CSFP<<'.';
+            }else {
+                CSFP<<" {\n";
+            }
         }while (substr);
     }
 }
@@ -219,11 +250,14 @@ static void closeNamespace(pPBJParser ctx) {
     if (SCOPE_TOP(NameSpace)->package&&SCOPE_SIZE(Symbols)<=2) {
         size_t stringSize=SCOPE_TOP(NameSpace)->package->size;
         size_t i;
-        if (SCOPE_TOP(NameSpace)->output->cpp) {
-            fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+        if (CSFP&&stringSize) {
+            CSFP<<"}\n";
+        }
+        if (CPPFP&&stringSize) {
+            CPPFP<<"}\n";
             for (i=0;i<stringSize;++i) {       
                 if (SCOPE_TOP(NameSpace)->package->chars[i]=='.') {
-                    fprintf (SCOPE_TOP(NameSpace)->output->cpp,"}\n");
+                    CPPFP<<"}\n";
                 }
             }
         }
@@ -233,155 +267,134 @@ pANTLR3_STRING defaultValuePreprocess(pPBJParser ctx, pANTLR3_STRING type, pANTL
     return stringDup(value);
 }
 
-static void sendTabs(pPBJParser ctx,int offset) {
+static std::ostream& sendTabs(pPBJParser ctx,int offset) {
     int num=SCOPE_SIZE(Symbols)+offset-1;
     int i;
     for (i=0;i<num;++i) {
-        fprintf(CPPFP,"    ");
+        CPPFP<<"    ";
     }
+    return CPPFP;
 }
 
-static void sendCppMessageLevels(pPBJParser ctx, FILE *fp) {
+static std::ostream& sendTabs(pPBJParser ctx,std::ostream &os,int offset) {
+    int num=SCOPE_SIZE(Symbols)+offset-1;
+    int i;
+    for (i=0;i<num;++i) {
+        os<<"    ";
+    }
+    return os;
+}
+
+static std::ostream& sendCppNs(pPBJParser ctx, std::ostream&fp,const char*delim="::") {
     int i;
     for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
         if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
-            fprintf(fp,"%s::",((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message->chars);
+            fp<<delim<<((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message->chars;
         }
     }
+    return fp;
 }
-
+static std::ostream& sendCsNs(pPBJParser ctx,  std::ostream&fp,const char*delim=".") {
+    return sendCppNs(ctx,fp,delim);
+}
 void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
+    SCOPE_TOP(Symbols)->message=stringDup(id);
+    SCOPE_TOP(Symbols)->cs_streams->csType=new std::stringstream;
+    SCOPE_TOP(Symbols)->cs_streams->csBuild=new std::stringstream;
+    SCOPE_TOP(Symbols)->cs_streams->csMembers=new std::stringstream;
     if (CPPFP) {
-        SCOPE_TOP(Symbols)->message=stringDup(id);
-        sendTabs(ctx,1);
-        fprintf(CPPFP,"class %s : protected _PBJ_Internal::",id->chars);
-        sendCppMessageLevels(ctx,CPPFP);
-        fprintf(CPPFP,"%s {\n",id->chars);
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"protected:\n");
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"_PBJ_Internal::");
-        sendCppMessageLevels(ctx,CPPFP);
-        fprintf(CPPFP,"%s *super;\n",id->chars);
-        sendTabs(ctx,1);
-        fprintf(CPPFP,"public:\n");
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"%s() {\n",id->chars);
-        sendTabs(ctx,3);
-        fprintf(CPPFP,"super=this;\n");
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"}\n");
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"%s(_PBJ_Internal::",id->chars);
-        sendCppMessageLevels(ctx,CPPFP);
-        fprintf(CPPFP,"%s &reference) {\n",id->chars);
-        sendTabs(ctx,3);
-        fprintf(CPPFP,"super=&reference;\n");
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"}\n",id->chars);
+        sendTabs(ctx,1)<<"class "<<id->chars<<" {\n";
+        sendTabs(ctx,1)<<"protected:\n";
+        sendTabs(ctx,2)<<"_PBJ_Internal::";
+        sendCppNs(ctx,CPPFP)<<id->chars<<" superconstructed;\n";
 
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"%s(const _PBJ_Internal::",id->chars);
-        sendCppMessageLevels(ctx,CPPFP);
-        fprintf(CPPFP,"%s &copy) {\n",id->chars);
-        sendTabs(ctx,3);
-        fprintf(CPPFP,"super=this;\n");
-        sendTabs(ctx,3);
-        fprintf(CPPFP,"*super=copy;\n");
-        sendTabs(ctx,2);
-        fprintf(CPPFP,"}\n",id->chars);
+        sendTabs(ctx,2)<<"_PBJ_Internal::";
+        sendCppNs(ctx,CPPFP)<<id->chars<<" *super;\n";
+        sendTabs(ctx,1)<<"public:\n";
+        sendTabs(ctx,2)<<id->chars<<"() {\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<id->chars<<"(_PBJ_Internal::";
+        sendCppNs(ctx,CPPFP)<<id->chars<<" &reference) {\n";
+        sendTabs(ctx,3)<<"super=&reference;\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<id->chars<<"(const _PBJ_Internal::";
+        sendCppNs(ctx,CPPFP)<<id->chars<<" &copy):superconstructed(copy) {\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<id->chars<<"& operator=(const "<<id->chars<<" &copy) {\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,3)<<"*super=copy;\n";
+        sendTabs(ctx,3)<<"return *this;\n";
+        sendTabs(ctx,2)<<"}\n";
+
+
+        sendTabs(ctx,2)<<"inline static "<<id->chars<<" default_instance() {\n";
+        sendTabs(ctx,3)<<id->chars<<"(const_cast<_PBJ_Internal::";
+        sendCppNs(ctx,CPPFP)<<id->chars<<"*>(&super->default_instance);\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<"static const ::google::protobuf::Descriptor* descriptor(){\n";
+        sendTabs(ctx,3)<<"return _PBJ_Internal::"<<id->chars<<"::descriptor();";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<"inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const{\n";
+        sendTabs(ctx,3)<<"return super->unknown_fields()";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<"inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields(){\n";
+        sendTabs(ctx,3)<<"return super->mutable_unknown_fields()";
+        sendTabs(ctx,2)<<"}\n";
+        
+
+        sendTabs(ctx,2)<<"const ::google::protobuf::Descriptor* GetDescriptor() const {\n";
+        sendTabs(ctx,3)<<"return super->GetDescriptor();\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<"const ::google::protobuf::Reflection* GetReflection() const {\n";
+        sendTabs(ctx,3)<<"return super->GetReflection();\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<"int GetCachedSize()const{ super->GetCachedSize(); }\n";
+        sendTabs(ctx,2)<<id->chars<<"* New()const{ return new "<<id->chars<<"; }\n";
+    }
+    if (CSFP) {
+        sendTabs(ctx,CSFP,1)<<"class "<<id->chars<<" {\n";
+        sendTabs(ctx,CSFP,2)<<"protected _PBJ_Internal.";
+        sendCsNs(ctx,CSFP)<<id->chars<<" super;\n";
+        sendTabs(ctx,CSFP,2)<<"public "<<id->chars<<"() {\n";
+        sendTabs(ctx,CSFP,3)<<"super=new _PBJ_Internal.";
+        sendCsNs(ctx,CSFP)<<id->chars<<"();\n";
+        sendTabs(ctx,CSFP,2)<<"}\n";
+        sendTabs(ctx,CSFP,2)<<"public "<<id->chars<<"(_PBJ_Internal::";
+        sendCsNs(ctx,CSFP)<<id->chars<<" reference) {\n";
+        sendTabs(ctx,CSFP,3)<<"super=reference;\n";
+        sendTabs(ctx,CSFP,2)<<"}\n";
+
+        sendTabs(ctx,CSFP,2)<<"public static "<<id->chars<<" defaultInstance= new "<<id->chars<<" (_PBJ_Internal.";
+        sendCsNs(ctx,CSFP)<<id->chars<<".DefaultInstance;\n";
+        sendTabs(ctx,CSFP,2)<<"public static "<<id->chars<<" DefaultInstance{\n";
+        sendTabs(ctx,CSFP,3)<<"get {return defaultInstance;}\n";
+        sendTabs(ctx,CSFP,2)<<"}\n";
+
+        sendTabs(ctx,CSFP,2)<<"public static pbd.MessageDescriptor Descriptor {\n";
+        sendTabs(ctx,CSFP,3)<<"get { return _PBJ_Internal.";
+        sendCsNs(ctx,CSFP)<<id->chars<<".Descriptor; }";
+        sendTabs(ctx,CSFP,2)<<"}\n";    
+        sendTabs(ctx,CSFP,2)<< "public static class Types {\n";
         
     }
 }
 void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
     if (CPPFP&&0) {
-        sendTabs(ctx,1);
-        fprintf(CPPFP,"class %sExtend : public %s {\n",id->chars,id->chars);
-        sendTabs(ctx,1);
-        fprintf(CPPFP,"public:\n",id->chars,id->chars);
+        sendTabs(ctx,1)<<"class "<<id->chars<<"Extend : public "<<id->chars<<" {\n";
+        sendTabs(ctx,1)<<"public:\n";
     }
 }
-const char *getProtoType(pPBJParser ctx, pANTLR3_STRING type) {
-    int *flagBits=NULL;
-    if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
-        if (*flagBits>64){
-            fprintf(stderr, "Error bitflag %d too high on enum %s\n",*flagBits,type->chars);
-        }
-        if (*flagBits>32) {
-            return "::google::protobuf::uint64";
-        }
-        if (*flagBits>16) {
-            return "::google::protobuf::uint32";
-        }
-        if (*flagBits>8) {
-            return "::google::protobuf::uint16";
-        }
-        return "::google::protobuf::uint8";
-    }
-    if (strcmp((char*)type->chars,"string")==0)
-        return "::std::string";
-    if (strcmp((char*)type->chars,"bytes")==0)
-        return "::std::string";
-    if (strcmp((char*)type->chars,"uuid")==0)
-        return "::std::string";
-    if (strcmp((char*)type->chars,"time")==0)
-        return "::google::protobuf::int64";
-    if (strcmp((char*)type->chars,"duration")==0)
-        return "::google::protobuf::int64";
-    if (strcmp((char*)type->chars,"angle")==0)
-        return "float";
 
-    if (strcmp((char*)type->chars,"sint64")==0)
-        return "::google::protobuf::int64";
-    if (strcmp((char*)type->chars,"int64")==0)
-        return "::google::protobuf::int64";
-    if (strcmp((char*)type->chars,"sint32")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"int32")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"sint16")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"int16")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"sint8")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"int8")==0)
-        return "::google::protobuf::int32";
-
-
-    if (strcmp((char*)type->chars,"sfixed64")==0)
-        return "::google::protobuf::int64";
-    if (strcmp((char*)type->chars,"sfixed32")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"sfixed16")==0)
-        return "::google::protobuf::int32";
-    if (strcmp((char*)type->chars,"sfixed8")==0)
-        return "::google::protobuf::int32";
-
-    if (strcmp((char*)type->chars,"fixed64")==0)
-        return "::google::protobuf::uint64";
-    if (strcmp((char*)type->chars,"uint64")==0)
-        return "::google::protobuf::uint64";
-    if (strcmp((char*)type->chars,"fixed32")==0)
-        return "::google::protobuf::uint32";
-    if (strcmp((char*)type->chars,"uint32")==0)
-        return "::google::protobuf::uint32";
-    if (strcmp((char*)type->chars,"fixed16")==0)
-        return "::google::protobuf::uint32";
-    if (strcmp((char*)type->chars,"uint16")==0)
-        return "::google::protobuf::uint32";
-    if (strcmp((char*)type->chars,"fixed8")==0)
-        return "::google::protobuf::uint32";
-    if (strcmp((char*)type->chars,"uint8")==0)
-        return "::google::protobuf::uint32";
-    if (strcmp((char*)type->chars,"float")==0||strcmp((char*)type->chars,"normal")==0||strcmp((char*)type->chars,"vector2f")==0||strcmp((char*)type->chars,"vector3f")==0||strcmp((char*)type->chars,"vector4f")==0||strcmp((char*)type->chars,"quaternion")==0||strcmp((char*)type->chars,"boundingsphere3f")==0||strcmp((char*)type->chars,"boundingbox3f3f")==0)
-        return "float";
-    if (strcmp((char*)type->chars,"double")==0||strcmp((char*)type->chars,"vector2d")==0||strcmp((char*)type->chars,"vector3d")==0||strcmp((char*)type->chars,"vector4d")==0||strcmp((char*)type->chars,"boundingsphere3d")==0||strcmp((char*)type->chars,"boundingbox3d3f")==0)
-        return "double";
-    return (const char*)type->chars;
-}
 int getNumItemsPerElement(pPBJParser ctx, pANTLR3_STRING type) {
     if (strcmp((char*)type->chars,"normal")==0||strcmp((char*)type->chars,"vector2f")==0||strcmp((char*)type->chars,"vector2d")==0)
         return 2;
@@ -392,6 +405,100 @@ int getNumItemsPerElement(pPBJParser ctx, pANTLR3_STRING type) {
     if (strcmp((char*)type->chars,"boundingbox3f3f")==0||strcmp((char*)type->chars,"boundingbox3d3f")==0)
         return 6;
     return 1;
+}
+const char *getCsType(pPBJParser ctx, pANTLR3_STRING type) {
+    int *flagBits=NULL;
+    if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
+        if (*flagBits>32) {
+            return "PBJ.uint64";
+        }
+        if (*flagBits>16) {
+            return "PBJ.uint32";
+        }
+        if (*flagBits>8) {
+            return "PBJ.uint16";
+        }
+        return "PBJ.uint8";
+    }
+    if (strcmp((char*)type->chars,"string")==0)
+        return "string";
+    if (strcmp((char*)type->chars,"bytes")==0)
+        return "PBJ.pb::ByteString";
+    if (strcmp((char*)type->chars,"uuid")==0)
+        return "PBJ.UUID";
+    if (strcmp((char*)type->chars,"time")==0)
+        return "PBJ.Time";
+    if (strcmp((char*)type->chars,"duration")==0)
+        return "PBJ.Duration";
+    if (strcmp((char*)type->chars,"angle")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"sint64")==0)
+        return "PBJ.int64";
+    if (strcmp((char*)type->chars,"int64")==0)
+        return "PBJ.int64";
+    if (strcmp((char*)type->chars,"sint32")==0)
+        return "PBJ.int32";
+    if (strcmp((char*)type->chars,"int32")==0)
+        return "PBJ.int32";
+    if (strcmp((char*)type->chars,"sint16")==0)
+        return "PBJ.int16";
+    if (strcmp((char*)type->chars,"int16")==0)
+        return "PBJ.int16";
+    if (strcmp((char*)type->chars,"sint8")==0)
+        return "PBJ.int8";
+    if (strcmp((char*)type->chars,"int8")==0)
+        return "PBJ.int8";
+
+    if (strcmp((char*)type->chars,"sfixed64")==0)
+        return "PBJ.int64";
+    if (strcmp((char*)type->chars,"sfixed32")==0)
+        return "PBJ.int32";
+    if (strcmp((char*)type->chars,"sfixed16")==0)
+        return "PBJ.int16";
+    if (strcmp((char*)type->chars,"sfixed8")==0)
+        return "PBJ.int8";
+
+    if (strcmp((char*)type->chars,"fixed64")==0)
+        return "PBJ.uint64";
+    if (strcmp((char*)type->chars,"uint64")==0)
+        return "PBJ.uint64";
+    if (strcmp((char*)type->chars,"fixed32")==0)
+        return "PBJ.uint32";
+    if (strcmp((char*)type->chars,"uint32")==0)
+        return "PBJ.uint32";
+    if (strcmp((char*)type->chars,"fixed16")==0)
+        return "PBJ.uint16";
+    if (strcmp((char*)type->chars,"uint16")==0)
+        return "PBJ.uint16";
+    if (strcmp((char*)type->chars,"fixed8")==0)
+        return "PBJ.uint8";
+    if (strcmp((char*)type->chars,"uint8")==0)
+        return "PBJ.uint8";
+    if (strcmp((char*)type->chars,"normal")==0)
+        return "PBJ.Vector3f";
+    if (strcmp((char*)type->chars,"vector2f")==0)
+        return "PBJ.Vector2f";        
+    if (strcmp((char*)type->chars,"vector2d")==0)
+        return "PBJ.Vector2f";        
+    if (strcmp((char*)type->chars,"quaternion")==0)
+        return "PBJ.Quaternion";
+    if (strcmp((char*)type->chars,"vector3f")==0)
+        return "PBJ.Vector3f";
+    if (strcmp((char*)type->chars,"vector3d")==0)
+        return "PBJ.Vector3d";
+    if (strcmp((char*)type->chars,"vector4f")==0)
+        return "PBJ.Vector4f";
+    if (strcmp((char*)type->chars,"vector4d")==0)
+        return "PBJ.Vector4d";
+    if (strcmp((char*)type->chars,"boundingsphere3f")==0)
+        return "PBJ.BoundingSphere3f";
+    if (strcmp((char*)type->chars,"boundingsphere3d")==0)
+        return "PBJ.BoundingSphere3d";
+    if (strcmp((char*)type->chars,"boundingbox3f3f")==0)
+        return "PBJ.BoundingBox3f3f";
+    if (strcmp((char*)type->chars,"boundingbox3d3f")==0)
+        return "PBJ.BoundingBox3d3f";
+    return (char*)type->chars;
 }
 const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
     int *flagBits=NULL;
@@ -466,7 +573,7 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
     if (strcmp((char*)type->chars,"vector2f")==0)
         return "PBJ::Vector2f";        
     if (strcmp((char*)type->chars,"vector2d")==0)
-        return "PBJ::Vector2f";        
+        return "PBJ::Vector2d";        
     if (strcmp((char*)type->chars,"quaternion")==0)
         return "PBJ::Quaternion";
     if (strcmp((char*)type->chars,"vector3f")==0)
@@ -487,6 +594,33 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
         return "PBJ::BoundingBox3d3f";
     return (char*)type->chars;
 }
+const char *getArrayType(pPBJParser ctx, pANTLR3_STRING type) {
+    if (strcmp((char*)type->chars,"normal")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"vector2f")==0)
+        return "float";        
+    if (strcmp((char*)type->chars,"vector2d")==0)
+        return "double";        
+    if (strcmp((char*)type->chars,"quaternion")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"vector3f")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"vector3d")==0)
+        return "double";
+    if (strcmp((char*)type->chars,"vector4f")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"vector4d")==0)
+        return "double";
+    if (strcmp((char*)type->chars,"boundingsphere3f")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"boundingsphere3d")==0)
+        return "double";
+    if (strcmp((char*)type->chars,"boundingbox3f3f")==0)
+        return "float";
+    if (strcmp((char*)type->chars,"boundingbox3d3f")==0)
+        return "double";
+    return (char*)type->chars;
+}
 const char *getPBJType(pPBJParser ctx, pANTLR3_STRING type) {
     if (strcmp((char*)type->chars,"angle")==0) {
         return "PBJ::angle";
@@ -503,94 +637,147 @@ const char *getPBJType(pPBJParser ctx, pANTLR3_STRING type) {
     return getCppType(ctx,type);
 
 }
-void printFlags(FILE *fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
+
+const char *getPBJCsType(pPBJParser ctx, pANTLR3_STRING type) {
+    if (strcmp((char*)type->chars,"angle")==0) {
+        return "PBJ.angle";
+    }
+    if (strcmp((char*)type->chars,"string")==0) {
+        return "PBJ.utf8string";
+    }
+    if (strcmp((char*)type->chars,"bytes")==0) {
+        return "PBJ.bytes";
+    }
+    if (strcmp((char*)type->chars,"normal")==0) {
+        return "PBJ.normal";
+    }
+    return getCppType(ctx,type);
+
+}
+std::ostream& printFlags(std::ostream&fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
     pANTLR3_STRING all_on =((pANTLR3_STRING)(flag_all_on->get(flag_all_on,name->chars)));
     if (all_on) {
-        fprintf(fp,"%s",all_on->chars);
+        fp.write((char*)all_on->chars,all_on->len);
     }else {
-        printf ("Invalid flags value %s\n",name->chars);
+        fprintf (stderr,"Invalid flags value %s\n",name->chars);
     }
+    return fp;
+}
+pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
+    pANTLR3_STRING uname=stringDup(name);
+    name->chars[0]=toupper(name->chars[0]);
+    return uname;
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isMultiplicitiveAdvancedType){
     if (SCOPE_TOP(Symbols)->message==NULL) {
-        fprintf(CPPFP,"using _PBJ_Internal::%s;\n",name->chars);
+        if (CPPFP) {
+            CPPFP<<"using _PBJ_Internal::"<<name->chars<<";\n";
+        }
+        if (CSFP) {
+            CSFP<<"using "<<name->chars<<" = _PBJ_Internal."<<name->chars<<";\n";
+        }
         return;
     }
+    pANTLR3_STRING uname=toFirstUpper(name);
+    pANTLR3_STRING utype=toFirstUpper(type);
     const char * cppType=getCppType(ctx,type);
+    const char * csType=getCsType(ctx,type);
     const char * pbjType=getPBJType(ctx,type);
-    const char * protoType=getProtoType(ctx,type);
     int isEnum = SCOPE_TOP(Symbols)->enum_sizes->get(SCOPE_TOP(Symbols)->enum_sizes,type->chars)!=NULL;
     int isFlag = SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)!=NULL;
     int isMessageType=((SCOPE_TOP(Symbols)->types->get(SCOPE_TOP(Symbols)->types,type->chars)!=NULL)&&!isEnum)&&!isFlag;
     int isRepeated=!notRepeated;
+    std::stringstream csShared;
     if (CPPFP) {
-        sendTabs(ctx,1);fprintf(CPPFP,"inline void clear_%s() {return super->clear_%s();}\n",name->chars,name->chars);
+        sendTabs(ctx,1)<<"inline void clear_"<<name->chars<<"() {return super->clear_"<<name->chars<<"();}\n";
+    }
+    if (CSFP) {
+        sendTabs(ctx,CSBUILD,1)<<"inline void Clear"<<uname->chars<<"() { return super->Clear"<<uname->chars<<"();} }\n";
     }
     if (isMultiplicitiveAdvancedType) {
         int numItemsPerElement=getNumItemsPerElement(ctx,type);
         if (CPPFP) {
             int i;
             if (isRepeated) {
-                sendTabs(ctx,1);fprintf(CPPFP,"inline int %s_size() const {return super->%s_size()/%d;}\n",name->chars,name->chars,numItemsPerElement);
-                sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index<%s_size()&&index>=0);return true;}\n",name->chars,name->chars);
+                sendTabs(ctx,csShared,1)<<"inline int "<<uname->chars<<"Count { get { return super->"<<uname->chars<<"Count/"<<numItemsPerElement<<";} }\n";
+                sendTabs(ctx,1)<<"inline int "<<name->chars<<"_size() const {return super->"<<name->chars<<"_size()/"<<numItemsPerElement<<";}\n";
+
+                sendTabs(ctx,csShared,1)<<"inline bool Has"<<uname->chars<<"(int index) { return true; }\n";
+                sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index<"<<name->chars<<"_size()&&index>=0);return true;}\n";
             }else {
-                sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {return super->%s_size()>=%d;}\n",name->chars,name->chars,numItemsPerElement);
+                sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->"<<name->chars<<"_size()>="<<numItemsPerElement<<";}\n";
+                sendTabs(ctx,csShared,1)<<"inline bool Has"<<uname->chars<<"{ get {return super->"<<uname->chars<<"Count>="<<numItemsPerElement<<";} }\n";
             }
-            sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s(%s) const {\n",cppType,name->chars,isRepeated?"int index":"");
-            sendTabs(ctx,2);fprintf(CPPFP,"if (has_%s(%s)) {\n",name->chars,isRepeated?"index":"");
-            sendTabs(ctx,3);fprintf(CPPFP,"return _PBJCast< %s>()(",pbjType);
+            sendTabs(ctx,csShared,1)<<csType<<" "<<uname->chars<<(isRepeated?"(int index)":"{ get ")<<" {\n";
+            sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<(isRepeated?"(index)":"")<<") {\n";
+            sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<utype->chars<<"(";
+            sendTabs(ctx,1)<<"inline "<<cppType<<" "<<name->chars<<"("<<(isRepeated?"int index":"")<<") const {\n";
+            sendTabs(ctx,2)<<"if (has_"<<name->chars<<"("<<(isRepeated?"index":"")<<")) {\n";
+            sendTabs(ctx,3)<<"return _PBJCast< "<<pbjType<<">()(";
             for (i=0;i<numItemsPerElement;++i) {
                 if (isRepeated) {
-                    fprintf(CPPFP,"super->%s(index*%d+%d)%s",name->chars,numItemsPerElement,i,i+1==numItemsPerElement?");\n":",");
+                    csShared<<"super->"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
+                    CPPFP<<"super->"<<name->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
                 }else {
-                    fprintf(CPPFP,"super->%s(%d)%s",name->chars,i,i+1==numItemsPerElement?");\n":",");
+                    csShared<<"super->"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
+                    CPPFP<<"super->"<<name->chars<<"("<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
                 }
             }
-            sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
+            sendTabs(ctx,csShared,2)<<"} else {\n";            
+            sendTabs(ctx,2)<<"} else {\n";
             if (value) {
-
-                sendTabs(ctx,3);fprintf(CPPFP,"return %s(%s);",cppType,value->chars);
+                sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");";
+                sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");";
             }else {
-                sendTabs(ctx,3);fprintf(CPPFP,"return _PBJCast< %s>()();\n",pbjType);
+                sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<utype->chars<<"();\n";
+                sendTabs(ctx,3)<<"return _PBJCast< "<<pbjType<<">()();\n";
             }
-            sendTabs(ctx,2);fprintf(CPPFP,"}\n");
-            sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-            sendTabs(ctx,1);fprintf(CPPFP,"inline void %s_%s(const %s &value) {\n",isRepeated?"add":"set",name->chars,cppType);
+            sendTabs(ctx,2)<<"}\n";
+            sendTabs(ctx,1)<<"}\n";
+            sendTabs(ctx,csShared,2)<<"}\n";
+            sendTabs(ctx,csShared,1)<<"}\n";
+            {
+                std::string temp=csShared.str();
+                CSBUILD <<temp;
+                CSMEM <<temp;
+            }
+            if (isRepeated==false) {//need a getter which needs an xtra brace  and then a setter
+                sendTabs(ctx,CSBUILD,1)<<"set {\n";
+            }else {
+                sendTabs(ctx,CSBUILD,1)<<"Builder Add"<<uname->chars<<"("<<csType<<" value) {\n";
+            }
+
+            sendTabs(ctx,1)<<"inline void "<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(const "<<cppType<<" &value) {\n";
             if (!isRepeated){
-                sendTabs(ctx,2);fprintf(CPPFP,"super->clear_%s();\n",name->chars);
+                sendTabs(ctx,2)<<"super->clear_"<<name->chars<<"();\n";
+                sendTabs(ctx,CSBUILD,2)<<"super->Clear"<<uname->chars<<"();\n";
             }
-            sendTabs(ctx,2);fprintf(CPPFP,"_PBJConstruct< %s>::ArrayType _PBJtempArray=_PBJConstruct< %s>()(value);\n",pbjType,pbjType);
+            sendTabs(ctx,2)<<"_PBJConstruct< "<<pbjType<<">::ArrayType _PBJtempArray=_PBJConstruct< "<<pbjType<<">()(value);\n";
+            sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=_PBJConstruct"<<utype->chars<<"(value);\n";
             for (i=0;i<numItemsPerElement;++i) {
-                sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(_PBJtempArray[%d]);\n",name->chars,i);
+                sendTabs(ctx,2)<<"super->add_"<<name->chars<<"(_PBJtempArray["<<i<<"]);\n";
+                sendTabs(ctx,CSBUILD,2)<<"super->Add"<<uname->chars<<"(_PBJtempArray["<<i<<"]);\n";
             }
-            sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-
+            sendTabs(ctx,CSBUILD,1)<<"}\n";
+            sendTabs(ctx,1)<<"}\n";
+            if (isRepeated==false) {
+                sendTabs(ctx,CSBUILD,1)<<"}\n";
+                sendTabs(ctx,CSMEM,1)<<"}\n";
+            }
             if (isRepeated) {
-                sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) {\n",name->chars,cppType);
+                sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const "<<cppType<<" &value) {\n";
+                sendTabs(ctx,2)<<"_PBJConstruct< "<<pbjType<<">::ArrayType _PBJtempArray=_PBJConstruct< "<<pbjType<<">()(value);\n";
+                sendTabs(ctx,CSBUILD,1)<<"Builder Set"<<uname->chars<<"(index,"<<csType<<" value) {\n";
+                sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=_PBJConstruct"<<utype->chars<<"(value);\n";
                 for (i=0;i<numItemsPerElement;++i) {
-                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index*%d+%d,_PBJConstruct< %s>()(value)[%d]);\n",name->chars,numItemsPerElement,i,pbjType,i);
+                    sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<",_PBJtempArray["<<i<<"]);\n";
+                    sendTabs(ctx,CSBUILD,2)<<"super->oSet"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<",_PBJtempArray["<<i<<"]);\n";
                 }
-                sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+                sendTabs(ctx,CSBUILD,1)<<"}\n";
+                sendTabs(ctx,1)<<"}\n";
             }
         }
-
     }else {
-        //set or add
-        if (isMessageType) {
-            sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s_%s() {\n",cppType,isRepeated?"add":"mutable",name->chars);
-            sendTabs(ctx,2);fprintf(CPPFP,"return *super->%s_%s();\n",isRepeated?"add":"mutable",name->chars);
-            sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-        }else {
-            sendTabs(ctx,1);fprintf(CPPFP,"inline void %s_%s(const %s &value) const {\n",isRepeated?"add":"set",name->chars,cppType);
-            if (isEnum) {
-                sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s((_PBJ_Internal::",isRepeated?"add":"set",name->chars);
-                sendCppMessageLevels(ctx,CPPFP);
-                fprintf(CPPFP,"%s::%s)value);\n",SCOPE_TOP(Symbols)->message->chars,type->chars);
-            }else {
-                sendTabs(ctx,2);fprintf(CPPFP,"super->%s_%s(_PBJConstruct< %s>()(value));\n",isRepeated?"add":"set",name->chars,pbjType);
-            }
-            sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
-        }
         if (isRepeated) {
             if (CPPFP) {
                 
@@ -663,7 +850,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) const {\n",name->chars,cppType);
                     if (isEnum) {
                         sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,(_PBJ_Internal::",name->chars);
-                        sendCppMessageLevels(ctx,CPPFP);
+                        sendCppNs(ctx,CPPFP);
                         fprintf(CPPFP,"%s::%s)(value));\n",SCOPE_TOP(Symbols)->message->chars,type->chars);
                     }else {
                         sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct< %s>()(value));\n",name->chars,pbjType);
@@ -675,55 +862,118 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             
         }else {
             if (CPPFP){
-                if (isMessageType) {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {return super->has_%s();}\n",name->chars,name->chars);
-                }else if (isFlag) {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"if (!super->has_%s()) return false;\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return _PBJValidateFlags< %s>()(super->%s(),",pbjType,name->chars);
-                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);                    
-                    fprintf(CPPFP,");\n");
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                }else {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s() const {return super->has_%s()&&_PBJValidate<%s>()(super->%s());}\n",name->chars,name->chars,pbjType,name->chars);
-                }
-                sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s() const {\n",cppType,name->chars);
-                if (value) {
-                    sendTabs(ctx,2);fprintf(CPPFP,"if (has_%s()) {\n",name->chars);
-                }
-                if (isMessageType) {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return %s(super->%s());\n",cppType,name->chars);
-                } else if (isFlag) {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags< %s>()(super->%s(),",pbjType,name->chars);
-                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
-                    fprintf(CPPFP,");\n",cppType,name->chars);
-                } else {
-                    sendTabs(ctx,value?3:2);fprintf(CPPFP,"return (%s)_PBJCast< %s>()(super->%s());\n",cppType,pbjType,name->chars);
-                }
-                if (value) {
-                    sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
-                    if(value) {
-                        sendTabs(ctx,3);fprintf(CPPFP,"return %s(%s);\n",cppType,value->chars);
-                    }else {
-                        sendTabs(ctx,3);fprintf(CPPFP,"%s _retval; return _retval;\n",cppType);
-                    }
-                    sendTabs(ctx,2);fprintf(CPPFP,"}\n");
-                }
-                sendTabs(ctx,1);fprintf(CPPFP,"}\n");
                 if (strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0) {//strings and bytes have special setter functionality
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(value);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+                    sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(const char *value) const {\n";
+                    sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(value);\n";
+                    sendTabs(ctx,1)<<"}\n";
                     
                     if (strcmp((char*)type->chars,"bytes")==0) {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(const void *value, size_t size) const {\n",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(value,size);\n",name->chars);
-                        sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+                        sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(const void *value, size_t size) const {\n";
+                        sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(value,size);\n";
+                        sendTabs(ctx,1)<<"}\n";
                     }
                 }
+                if (isMessageType||isEnum) {
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->has_"<<name->chars<<"();}\n";
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"get { {return super->Has"<<uname->chars<<"();} }\n";
+                }else if (isFlag) {
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {\n";
+                    sendTabs(ctx,2)<<"if (!super->has_"<<name->chars<<"()) return false;\n";
+                    sendTabs(ctx,2)<<"return _PBJValidateFlags< "<<pbjType<<">()(super->"<<name->chars<<"(),";
+                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,1)<<"}\n";
+
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<" { get {\n";
+                    sendTabs(ctx,csShared,2)<<"if (!super->Has"<<uname->chars<<") return false;\n";
+                    sendTabs(ctx,csShared,2)<<"return PBJ._PBJValidateFlags"<<type->chars<<"()(super."<<name->chars<<",";
+                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,csShared,1)<<"} }\n";
+
+
+                }else {
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super->Has"<<uname->chars<<"()&&PBJ._PBJValidate"<<utype->chars<<"(super."<<uname->chars<<");} }\n";
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->has_"<<name->chars<<"()&&_PBJValidate<"<<pbjType<<">()(super->"<<name->chars<<"());}\n";
+                }
+
+
+                sendTabs(ctx,1)<<"inline "<<cppType<<" "<<name->chars<<"() const {\n";
+                sendTabs(ctx,2)<<"if (has_"<<name->chars<<"()) {\n";
+                sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"{ get {\n";
+                sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<"()) {\n";
+                if (isMessageType) {
+                    sendTabs(ctx,3)<<"return "<<type->chars<<"(super->"<<name->chars<<"());\n";
+                    sendTabs(ctx,csShared,3)<<"return new "<<type->chars<<"(super."<<name->chars<<"());\n";
+                } else if (isFlag) {
+                    sendTabs(ctx,3)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(),";
+                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    
+                    sendTabs(ctx,csShared,3)<<"return PBJ._PBJCastFlags(super."<<name->chars<<"(),";
+                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                } else {
+                    sendTabs(ctx,3)<<"return ("<<cppType<<")_PBJCast< "<<pbjType<<">()(super->"<<name->chars<<"());\n";
+                    sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<type->chars<<"(super."<<name->chars<<"());\n";
+                }
+                sendTabs(ctx,2)<<"} else {\n";
+                if(value) {
+                    sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
+                    sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");\n";
+                }else {
+                    sendTabs(ctx,csShared,3)<<"return _PBJCast"<<type->chars<<"();\n";
+                    sendTabs(ctx,csShared,value?3:2)<<"return PBJ._PBJCast"<<type->chars<<"();\n";
+                }
+                sendTabs(ctx,2)<<"}\n";
+                sendTabs(ctx,csShared,2)<<"}\n";
+                sendTabs(ctx,1)<<"}\n";
+                sendTabs(ctx,csShared,1)<<"}\n";
+
             }
         }
+        {
+            std::string temp=csShared.str();
+            CSBUILD<<temp;
+            CSMEM<<temp;
+        }
+        //set or add
+        if (isMessageType) {
+            if (isRepeated) {
+                sendTabs(ctx,CSBUILD,1)<<csType<<"Add"<<uname->chars<<"() {\n";
+                sendTabs(ctx,CSBUILD,1)<<"return super->"<<"Add"<<uname->chars<<"();\n";
+                sendTabs(ctx,CSBUILD,1)<<"}\n";
+            }else {                                                                                                     
+                sendTabs(ctx,CSBUILD,1)<<"set {";
+                sendTabs(ctx,CSBUILD,1)<<"return super->"<<uname->chars<<";\n";
+                sendTabs(ctx,CSBUILD,1)<<"}\n";
+            }
+            sendTabs(ctx,1)<<"inline "<<cppType<<" "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
+            sendTabs(ctx,2)<<"return *super->"<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"();\n";
+            sendTabs(ctx,1)<<"}\n";
+        }else {
+            if (isRepeated) {
+                sendTabs(ctx,CSBUILD,1)<<csType<<"Add"<<uname->chars<<"() {\n";
+            }else {
+                sendTabs(ctx,CSBUILD,1)<<"set {";
+            }
+            sendTabs(ctx,1)<<"inline void "<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(const "<<cppType<<" &value) const {\n";
+            if (isEnum) {
+                sendTabs(ctx,2)<<"super->"<<(isRepeated?"add":"set")<<"_"<<name->chars<<"((_PBJ_Internal::";
+                sendCppNs(ctx,CPPFP)<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")value);\n";
+                sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<name->chars<<(isRepeated?"":"=")<<"((_PBJ_Internal.";
+                sendCsNs(ctx,CSBUILD)<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")value);\n";
+
+            }else {
+                sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<name->chars<<(isRepeated?"":"=")<<(isFlag?"((":"(PBJ._PBJ_Construct(")<<"value));\n";
+                sendTabs(ctx,2)<<"super->"<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(_PBJConstruct< "<<pbjType<<">()(value));\n";
+            }
+            sendTabs(ctx,1)<<"}\n";
+            sendTabs(ctx,CSBUILD,1)<<"}\n";
+        }
+        if (!isRepeated) {
+            sendTabs(ctx,CSBUILD,1)<<"}\n";//closing the !repeated set{ and get{
+            sendTabs(ctx,CSMEM,1)<<"}\n";
+        }
     }
+    stringFree(uname);
+    stringFree(utype);
 }
 void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumValues) {
     int enumSize=enumValues->size(enumValues);
@@ -805,16 +1055,20 @@ void defineFlagValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING 
 }
 void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
     if (CPPFP) {
-        sendTabs(ctx,0);
-        fprintf(CPPFP,"};\n");
+        sendTabs(ctx,0)<<"};\n";
+    }
+    if (CSFP) {
+        CSFP<<*SCOPE_TOP(Symbols)->cs_streams->csType;
+        CSFP<<*SCOPE_TOP(Symbols)->cs_streams->csMembers;
+        CSFP<<*SCOPE_TOP(Symbols)->cs_streams->csBuild;
+        sendTabs(ctx,CSFP,0)<<"}\n";
     }
     closeNamespace(ctx);
 }
 
 void defineExtensionEnd(pPBJParser ctx, pANTLR3_STRING id){
     if (CPPFP&&0) {
-        sendTabs(ctx,0);
-        fprintf(CPPFP,"};\n");
+        sendTabs(ctx,0)<<"};\n";
     }
     closeNamespace(ctx);
 }

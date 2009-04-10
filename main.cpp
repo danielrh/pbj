@@ -2,6 +2,7 @@
 extern "C" {
 #include "PBJParseUtil.h"
 }
+#include "PBJLanguageOutput.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -48,7 +49,7 @@ int main(int argc, char *argv[])
     SCOPE_TOP(NameSpace)->filename->append8(SCOPE_TOP(NameSpace)->filename,(const char*)outputFilename);
     SCOPE_TOP(NameSpace)->output=(struct LanguageOutputStruct*)malloc(sizeof(struct LanguageOutputStruct));
     SCOPE_TOP(NameSpace)->output->cs=NULL;
-    SCOPE_TOP(NameSpace)->output->cpp=stdout;//could open something dependent on filename
+    SCOPE_TOP(NameSpace)->output->cpp=std::cout;//could open something dependent on filename
 
     pbjAST=psr->protocol(psr);
     if (psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec) > 0)

@@ -27,6 +27,7 @@ scope Symbols {
     pANTLR3_HASH_TABLE flag_values;
     pANTLR3_HASH_TABLE flag_all_on;
     pANTLR3_HASH_TABLE enum_values;
+    struct CsStreams *cs_streams;
 }
 
 @members {
