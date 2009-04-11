@@ -781,84 +781,112 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
         if (isRepeated) {
             if (CPPFP) {
                 
-                sendTabs(ctx,1);fprintf(CPPFP,"inline int %s_size() const {return super->%s_size();}\n",name->chars,name->chars);
-
-                if (strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0) {//strings and bytes have special setter functionality
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index,value);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline void add_%s(const char *value) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(value);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline const ::std::string& %s(int index) const {\n",name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return super->%s(index);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");                    
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<%s_size()); return true;}\n",name->chars,name->chars);
-                    
+                sendTabs(ctx,1)<<"inline int "<<name->chars<<"_size() const {return super->"<<name->chars<<"_size();}\n";
+                sendTabs(ctx,1)<<"public int "<<uname->chars<<"Count { get { return super."<<uname->chars<<"Count;} }\n";
+                bool isRawByteArray=(strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0);
+                if (isRawByteArray) {//strings and bytes have special setter functionality
+                    sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const char *value) const {\n";
+                    sendTabs(ctx,2)<<"super.set_"<<name->chars<<"(index,value);\n";
+                    sendTabs(ctx,1)<<"}\n";
+                    sendTabs(ctx,1)<<"inline void add_"<<name->chars<<"(const char *value) const {\n";
+                    sendTabs(ctx,2)<<"super->add_"<<name->chars<<"(value);\n";
+                    sendTabs(ctx,1)<<"}\n";
+/*
+                    sendTabs(ctx,1)<<"inline const ::std::string& "<<name->chars<<"(int index) const {\n";
+                    sendTabs(ctx,2)<<"return super->"<<name->chars<<"(index);\n";
+                    sendTabs(ctx,1)<<"}\n";                    
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index>=0&&index<"<<name->chars<<"_size()); return true;}\n";
+*/
                     if (strcmp((char*)type->chars,"bytes")==0) {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const void *value, size_t size) const {\n",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"super->set_%s(index,value,size);\n",name->chars);
-                        sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline void add_%s(const void *value, size_t size) const {\n",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"super->add_%s(value,size);\n",name->chars);
-                        sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+                        sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const void *value, size_t size) const {\n";
+                        sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(index,value,size);\n";
+                        sendTabs(ctx,1)<<"}\n";
+                        sendTabs(ctx,1)<<"inline void add_"<<name->chars<<"(const void *value, size_t size) const {\n";
+                        sendTabs(ctx,2)<<"super->add_"<<name->chars<<"(value,size);\n";
+                        sendTabs(ctx,1)<<"}\n";
                     }
+                }
+                if (isMessageType||isEnum) {
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index>=0&&index<"<<name->chars<<"_size()); return true;}\n";
+                    sendTabs(ctx,csShared,1)<<"inline bool Has"<<uname->chars<<"(int index) const {return true;}\n";
+                }else if (isFlag) {
+                    int i,numFlags=0;
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {";
+                    sendTabs(ctx,2)<<"assert(index>=0&&index<"<<name->chars<<"_size();\n";
+                    sendTabs(ctx,2)<<"return _PBJValidateFlags< "<<pbjType<<">()(super->"<<name->chars<<"(index),";
+                                        
+                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,1)<<"}\n";
+
+
+                    sendTabs(ctx,csShared,1)<<"inline bool Has"<<uname->chars<<"(int index) const {";
+                    sendTabs(ctx,csShared,2)<<"return PBJ._PBJValidateFlags(super."<<uname->chars<<"(index),";
+                                        
+                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,csShared,1)<<"}\n";
+
                 }else {
-                    if (isMessageType) {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<%s_size()); return true;}\n",name->chars,name->chars,name->chars);
-                    }else if (isFlag) {
-                        int i,numFlags=0;
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {",name->chars);
-                        sendTabs(ctx,2);fprintf(CPPFP,"assert(index>=0&&index<%s_size();\n",name->chars); 
-                        sendTabs(ctx,2);fprintf(CPPFP,"return _PBJValidateFlags< %s>()(super->%s(index),",pbjType,name->chars);
-                        
-                        printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
-                        fprintf(CPPFP,");\n");
-                        sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                    }else {
-                        sendTabs(ctx,1);fprintf(CPPFP,"inline bool has_%s(int index) const {assert(index>=0&&index<%s_size()); return _PBJValidate<%s>()(super->%s(index));}\n",name->chars,name->chars,pbjType,name->chars);
-                    }
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline %s %s(int index) const {\n",cppType,name->chars);
-                    if (value) {
-                        sendTabs(ctx,2);fprintf(CPPFP,"if (has_%s(index)) {\n",name->chars);
-                    }
-                    if (isMessageType) {
-                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return %s(super->%s(index));\n",cppType,name->chars);//FIXME:cast
-                    } else if (isFlag) {
-                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return _PBJCastFlags< %s>(index)(super->%s(index),",pbjType,name->chars);
-                        printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type);
-                        fprintf(CPPFP,");\n",cppType,name->chars);
-                    } else {
-                        sendTabs(ctx,value?3:2);fprintf(CPPFP,"return (%s)_PBJCast< %s>()(super->%s(index));\n",cppType,pbjType,name->chars);
-                    }
-                    if (value) {
-                        sendTabs(ctx,2);fprintf(CPPFP,"} else {\n");
-                        if(value) {
-                            sendTabs(ctx,3);fprintf(CPPFP,"return %s(%s);\n",cppType,value->chars);
-                        }else {
-                            sendTabs(ctx,3);fprintf(CPPFP,"%s _retval; return _retval;\n",cppType);
-                        }
-                        sendTabs(ctx,2);fprintf(CPPFP,"}\n");
-                    }
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+                    sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index>=0&&index<"<<name->chars<<"_size()); return _PBJValidate< "<<pbjType<<">()(super->"<<name->chars<<"(index));}\n";
+                    sendTabs(ctx,1)<<"inline bool Has"<<uname->chars<<"(int index) {return PBJ._PBJValidate"<<utype->chars<<"(super."<<uname->chars<<"(index));}\n";
+                }
+                sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"(int index) {\n";
+                sendTabs(ctx,1)<<"inline "<<(isRawByteArray?"const std::string&":cppType)<<" "<<name->chars<<"(int index) const {\n";
+                if (value) {
+                    sendTabs(ctx,2)<<"if (has_"<<name->chars<<"(index)) {\n";
+                    sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<"(index)) {\n";
                 }
                 if (isMessageType) {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline %s set_%s(int index) {\n",cppType,name->chars);
-                    sendTabs(ctx,2);fprintf(CPPFP,"return *super->mutable_%s(index);\n",name->chars);
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");
-                }else {
-                    sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) const {\n",name->chars,cppType);
-                    if (isEnum) {
-                        sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,(_PBJ_Internal::",name->chars);
-                        sendCppNs(ctx,CPPFP);
-                        fprintf(CPPFP,"%s::%s)(value));\n",SCOPE_TOP(Symbols)->message->chars,type->chars);
-                    }else {
-                        sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct< %s>()(value));\n",name->chars,pbjType);
-                    }
-                    sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
+                    sendTabs(ctx,value?3:2)<<"return "<<cppType<<"(super->"<<name->chars<<"(index));\n";//FIXME:cast
+                    sendTabs(ctx,csShared,value?3:2)<<"return "<<type->chars<<"(super."<<uname->chars<<"(index));\n";//FIXME:cast
+                } else if (isFlag) {
+                    sendTabs(ctx,value?3:2)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(index),";
+                    printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+
+                    sendTabs(ctx,csShared,value?3:2)<<"return PBJ._PBJCastFlags"<<utype->chars<<"(super."<<name->chars<<"(index),";
+                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                } else if (isEnum) {
+                    sendTabs(ctx,value?3:2)<<"return ("<<type->chars<<")(super->"<<name->chars<<"(index))\n;";
+                    sendTabs(ctx,csShared,value?3:2)<<"return ("<<type->chars<<")(super."<<uname->chars<<"(index))\n;";
+
+                } else {
+                    sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast< "<<pbjType<<">()(super->"<<name->chars<<"(index));\n";
+                    sendTabs(ctx,csShared,value?3:2)<<"return ("<<csType<<")_PBJCast"<<utype->chars<<"(super->"<<name->chars<<"(index));\n";
                 }
-                
+                if (value) {
+                    sendTabs(ctx,2)<<"} else {\n";
+                    sendTabs(ctx,csShared,2)<<"} else {\n";
+                    if(value) {
+                        sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
+                        sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");\n";
+                    }else {
+                        sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast< "<<pbjType<<">()();\n";
+                        sendTabs(ctx,csShared,value?3:2)<<"return _PBJCast"<<utype->chars<<"();\n";
+                    }
+                    sendTabs(ctx,2)<<"}\n";
+                    sendTabs(ctx,csShared,2)<<"}\n";
+                }
+                sendTabs(ctx,1)<<"}\n";
+                sendTabs(ctx,csShared,1)<<"}\n";
             }
+            if (isMessageType) {
+                sendTabs(ctx,CSBUILD,1)<<"inline void Set"<<uname->chars<<"(int index,"<<type->chars<<" value) {\n";
+                //FIXME need access to the super
+                sendTabs(ctx,1)<<"inline "<<cppType<<" set_"<<name->chars<<"(int index) {\n";
+                sendTabs(ctx,2);fprintf(CPPFP,"return *super->mutable_%s(index);\n",name->chars);
+                sendTabs(ctx,1);fprintf(CPPFP,"}\n");
+            }else {
+                sendTabs(ctx,1);fprintf(CPPFP,"inline void set_%s(int index, const %s &value) const {\n",name->chars,cppType);
+                if (isEnum) {
+                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,(_PBJ_Internal::",name->chars);
+                    sendCppNs(ctx,CPPFP);
+                    fprintf(CPPFP,"%s::%s)(value));\n",SCOPE_TOP(Symbols)->message->chars,type->chars);
+                }else {
+                    sendTabs(ctx,2);fprintf(CPPFP,"return super->set_%s(index,_PBJConstruct< %s>()(value));\n",name->chars,pbjType);
+                }
+                sendTabs(ctx,1);fprintf(CPPFP,"}\n");                
+            }
+                
+            
             
         }else {
             if (CPPFP){
@@ -891,7 +919,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
 
 
                 }else {
-                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super->Has"<<uname->chars<<"()&&PBJ._PBJValidate"<<utype->chars<<"(super."<<uname->chars<<");} }\n";
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super->Has"<<uname->chars<<"&&PBJ._PBJValidate"<<utype->chars<<"(super."<<uname->chars<<");} }\n";
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->has_"<<name->chars<<"()&&_PBJValidate<"<<pbjType<<">()(super->"<<name->chars<<"());}\n";
                 }
 
