@@ -4,7 +4,20 @@
 #include "util/BoundingBox.hpp"
 #include "util/Vector2.hpp"
 #include "util/Time.hpp"
+#include <google/protobuf/generated_message_reflection.h>
 namespace PBJ {
+
+class Message {
+    ::google::protobuf::Message * _mMessage;
+protected:
+    Message(::google::protobuf::Message *msg){
+        _mMessage=msg;
+    }
+    void setMessageRepresentation(::google::protobuf::Message * msg) {
+        _mMessage=msg;
+    }
+};
+
 typedef Sirikata::UUID UUID;
 typedef Sirikata::uint64 uint64;
 typedef Sirikata::uint32 uint32;
