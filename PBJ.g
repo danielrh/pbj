@@ -21,6 +21,7 @@ scope NameSpace {
 
 scope Symbols {
     pANTLR3_STRING message;
+    pANTLR3_LIST required_advanced_fields;
     pANTLR3_HASH_TABLE types;
     pANTLR3_HASH_TABLE flag_sizes;
     pANTLR3_HASH_TABLE enum_sizes;
@@ -198,7 +199,7 @@ field
     @init {$field::defaultValue=NULL;}
     :  ( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
     {
-        defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,1);
+        defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,$REQUIRED!=NULL,1);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
         stringFree($field::defaultValue);
@@ -208,7 +209,7 @@ field
       | 
       ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
     {
-        defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,0);
+        defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$REPEATED==NULL,$REQUIRED!=NULL,0);
         stringFree($field::fieldName);
         stringFree($field::fieldType);
         stringFree($field::defaultValue);

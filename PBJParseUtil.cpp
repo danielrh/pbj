@@ -12,6 +12,7 @@ void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->flag_values->free(symtab->flag_values);
     symtab->flag_all_on->free(symtab->flag_all_on);
     symtab->enum_values->free(symtab->enum_values);
+    symtab->required_advanced_fields->free(symtab->required_advanced_fields);
     if (symtab->message) {
         stringFree(symtab->message);
     }
@@ -67,6 +68,7 @@ void  initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, in
     symtab->cs_streams->csMembers=new std::stringstream;
 
     symtab->message=NULL;
+    symtab->required_advanced_fields = antlr3ListNew(1);
     symtab->types = antlr3HashTableNew(11);
     symtab->flag_all_on = antlr3HashTableNew(11);
     symtab->flag_sizes = antlr3HashTableNew(11);
@@ -300,6 +302,21 @@ static std::ostream& sendCppNs(pPBJParser ctx, std::ostream&fp,const char*delim=
     }
     return fp;
 }
+static std::ostream& sendHashNs(pPBJParser ctx, std::ostream&fp) {
+    int i;
+    unsigned int delim=0;
+    for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
+        if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
+            pANTLR3_STRING msg=((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message;
+            int i;
+            for (i=0;i<msg->len;++i){ 
+                delim=delim^(msg->chars[i]+i*63);
+            }
+            fp<<msg->chars<<delim;
+        }
+    }
+    return fp;
+}
 static std::ostream& sendCsNs(pPBJParser ctx,  std::ostream&fp,const char*delim=".") {
     return sendCppNs(ctx,fp,delim);
 }
@@ -307,7 +324,19 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
     SCOPE_TOP(Symbols)->message=stringDup(id);
     if (CPPFP) {
-        sendTabs(ctx,1)<<"class "<<id->chars<<" : public PBJ::Message {\n";
+/*
+        sendTabs(ctx,1)<<"class "<<id->chars;
+        sendHashNs(ctx,CPPFP)<<"HasFields : public PBJ::HasFields {\n";
+        sendTabs(ctx,2)<<"template <class Message> bool operator() (const Message* thus) const {\n";
+        sendTabs(ctx,3)<<"return evaluateInput(computeHasFields(thus));\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<"template <class Message> bool operator() (const Message* thus, bool isOutput) const {\n";
+        sendTabs(ctx,3)<<"return evaluateOutput(computeHasFields(thus));\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<"template <class Message> bool computeHasFields(const Message* thus) const;\n";
+        sendTabs(ctx,1)<<"};\n";
+*/
+        sendTabs(ctx,1)<<"class "<<id->chars<<" : public PBJ::Message< "<<id->chars<<" > {\n";
         sendTabs(ctx,1)<<"protected:\n";
         sendTabs(ctx,2)<<"_PBJ_Internal";
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" superconstructed;\n";
@@ -318,16 +347,16 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,2)<<"_PBJ_Internal";
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"* _PBJSuper(){ return super; }\n";
 
-        sendTabs(ctx,2)<<id->chars<<"():PBJ::Message(&superconstructed) {\n";
+        sendTabs(ctx,2)<<id->chars<<"():PBJ::Message< "<<id->chars<<"> (&superconstructed) {\n";
         sendTabs(ctx,3)<<"super=&superconstructed;\n";
         sendTabs(ctx,2)<<"}\n";
         sendTabs(ctx,2)<<id->chars<<"(_PBJ_Internal";
-        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &reference):Message(&reference) {\n";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &reference):PBJ::Message< "<<id->chars<<" >(&reference) {\n";
         sendTabs(ctx,3)<<"super=&reference;\n";
         sendTabs(ctx,2)<<"}\n";
 
         sendTabs(ctx,2)<<id->chars<<"(const _PBJ_Internal";
-        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &copy):PBJ::Message(&superconstructed), superconstructed(copy) {\n";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &copy):PBJ::Message< "<<id->chars<<" >(&superconstructed), superconstructed(copy) {\n";
         sendTabs(ctx,3)<<"super=&superconstructed;\n";
         sendTabs(ctx,2)<<"}\n";
 
@@ -680,7 +709,10 @@ pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
     uname->chars[0]=toupper(name->chars[0]);
     return uname;
 }
-void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isMultiplicitiveAdvancedType){
+void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isRequired, int isMultiplicitiveAdvancedType){
+    if (isMultiplicitiveAdvancedType&&isRequired) {
+        SCOPE_TOP(Symbols)->required_advanced_fields->put(SCOPE_TOP(Symbols)->required_advanced_fields,SCOPE_TOP(Symbols)->required_advanced_fields->size(SCOPE_TOP(Symbols)->required_advanced_fields),stringDup(name),&stringFree);
+    }
     if (SCOPE_TOP(Symbols)->message==NULL) {
         if (CPPFP) {
             CPPFP<<"using _PBJ_Internal::"<<name->chars<<";\n";
@@ -871,7 +903,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                         sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
                         sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");\n";
                     }else {
-                        sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast< "<<pbjType<<">()();\n";
+                        sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast"<<(isMessageType?"Message":"")<<"< "<<pbjType<<">()();\n";
                         sendTabs(ctx,csShared,value?3:2)<<"return _PBJCast"<<utype->chars<<"();\n";
                     }
                     sendTabs(ctx,2)<<"}\n";
@@ -970,7 +1002,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");\n";
                 }else {
                     sendTabs(ctx,csShared,3)<<"return _PBJCast"<<type->chars<<"();\n";
-                    sendTabs(ctx,csShared,value?3:2)<<"return PBJ._PBJCast"<<type->chars<<"();\n";
+                    sendTabs(ctx,3)<<"return _PBJCast"<<(isMessageType?"Message":"")<<" < "<<pbjType<<"> ()();\n";
                 }
                 sendTabs(ctx,2)<<"}\n";
                 sendTabs(ctx,csShared,2)<<"}\n";
@@ -1099,14 +1131,45 @@ void defineFlagValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING 
     flagValues->put(flagValues,flagValues->size(flagValues),id,stringFree);
     flagValues->put(flagValues,flagValues->size(flagValues),value,stringFree);
 }
-void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
+void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){    
+    pANTLR3_LIST reqAdv=SCOPE_TOP(Symbols)->required_advanced_fields;
     if (CPPFP) {
+        sendTabs(ctx,1)<<"bool _HasAllPBJFields() const {\n";//types
+        sendTabs(ctx,2)<<"return true\n";
+        {
+            int i;
+            int size=reqAdv->size(reqAdv);
+            for (i=0;i<size;++i) {
+                pANTLR3_STRING s=(pANTLR3_STRING)reqAdv->get(reqAdv,i);
+                sendTabs(ctx,3)<<"&&has_"<<s->chars<<"()\n";
+            }
+            sendTabs(ctx,3)<<";\n";            
+        }
+        sendTabs(ctx,1)<<"}";
+        
         sendTabs(ctx,0)<<"};\n";
     }
     if (CSFP) {
-        CSFP<<*SCOPE_TOP(Symbols)->cs_streams->csType;
-        CSFP<<*SCOPE_TOP(Symbols)->cs_streams->csMembers;
-        CSFP<<*SCOPE_TOP(Symbols)->cs_streams->csBuild;
+        int i;
+        CSFP<<SCOPE_TOP(Symbols)->cs_streams->csType->str();
+        sendTabs(ctx,CSFP,1)<<"}\n";//types
+        sendTabs(ctx,CSFP,1)<<"protected bool _HasAllPBJFields() {\n";//types
+        sendTabs(ctx,CSFP,2)<<"return true\n";
+        {
+            int i;
+            int size=reqAdv->size(reqAdv);
+            for (i=0;i<size;++i) {
+                pANTLR3_STRING s=toFirstUpper((pANTLR3_STRING)reqAdv->get(reqAdv,i));
+                sendTabs(ctx,CSFP,3)<<"&&Has"<<s<<"\n";
+                stringFree(s);
+            }
+            sendTabs(ctx,CSFP,3)<<";\n";            
+        }
+        sendTabs(ctx,CSFP,1)<<"}";
+        CSFP<<SCOPE_TOP(Symbols)->cs_streams->csMembers->str();
+        sendTabs(ctx,CSFP,1)<<"class Builder {\n";//types
+        CSFP<<SCOPE_TOP(Symbols)->cs_streams->csBuild->str();
+        sendTabs(ctx,CSFP,1)<<"}\n";
         sendTabs(ctx,CSFP,0)<<"}\n";
     }
     closeNamespace(ctx);
