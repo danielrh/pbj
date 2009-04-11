@@ -51,7 +51,7 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
             symtab->filename->chars[symtab->filename->len-6]=lst;
         }
         if (symtab->output->cs) {
-            *symtab->output->cs<<"using converters = global::PBJ.Converters;\n";
+//            *symtab->output->cs<<"using converters = global::PBJ.Converters;\n";
             *symtab->output->cs<<"using pbd = global::Google.ProtocolBuffers.Descriptors;\n";
             *symtab->output->cs<<"using pb = global::Google.ProtocolBuffers;\n";
         }
@@ -461,15 +461,15 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
     int *flagBits=NULL;
     if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
         if (*flagBits>32) {
-            return "PBJ.uint64";
+            return "ulong";
         }
         if (*flagBits>16) {
-            return "PBJ.uint32";
+            return "uint";
         }
         if (*flagBits>8) {
-            return "PBJ.uint16";
+            return "ushort";
         }
-        return "PBJ.uint8";
+        return "byte";
     }
     if (strcmp((char*)type->chars,"double")==0)
         return "double";
@@ -489,47 +489,47 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
     if (strcmp((char*)type->chars,"angle")==0)
         return "float";
     if (strcmp((char*)type->chars,"sint64")==0)
-        return "PBJ.int64";
+        return "long";
     if (strcmp((char*)type->chars,"int64")==0)
-        return "PBJ.int64";
+        return "long";
     if (strcmp((char*)type->chars,"sint32")==0)
-        return "PBJ.int32";
+        return "int";
     if (strcmp((char*)type->chars,"int32")==0)
-        return "PBJ.int32";
+        return "int";
     if (strcmp((char*)type->chars,"sint16")==0)
-        return "PBJ.int16";
+        return "short";
     if (strcmp((char*)type->chars,"int16")==0)
-        return "PBJ.int16";
+        return "short";
     if (strcmp((char*)type->chars,"sint8")==0)
-        return "PBJ.int8";
+        return "sbyte";
     if (strcmp((char*)type->chars,"int8")==0)
-        return "PBJ.int8";
+        return "sbyte";
 
     if (strcmp((char*)type->chars,"sfixed64")==0)
-        return "PBJ.int64";
+        return "long";
     if (strcmp((char*)type->chars,"sfixed32")==0)
-        return "PBJ.int32";
+        return "int";
     if (strcmp((char*)type->chars,"sfixed16")==0)
-        return "PBJ.int16";
+        return "short";
     if (strcmp((char*)type->chars,"sfixed8")==0)
-        return "PBJ.int8";
+        return "sbyte";
 
     if (strcmp((char*)type->chars,"fixed64")==0)
-        return "PBJ.uint64";
+        return "ulong";
     if (strcmp((char*)type->chars,"uint64")==0)
-        return "PBJ.uint64";
+        return "ulong";
     if (strcmp((char*)type->chars,"fixed32")==0)
-        return "PBJ.uint32";
+        return "uint";
     if (strcmp((char*)type->chars,"uint32")==0)
-        return "PBJ.uint32";
+        return "uint";
     if (strcmp((char*)type->chars,"fixed16")==0)
-        return "PBJ.uint16";
+        return "ushort";
     if (strcmp((char*)type->chars,"uint16")==0)
-        return "PBJ.uint16";
+        return "ushort";
     if (strcmp((char*)type->chars,"fixed8")==0)
-        return "PBJ.uint8";
+        return "byte";
     if (strcmp((char*)type->chars,"uint8")==0)
-        return "PBJ.uint8";
+        return "byte";
     if (strcmp((char*)type->chars,"normal")==0)
         return "PBJ.Vector3f";
     if (strcmp((char*)type->chars,"vector2f")==0)
@@ -735,7 +735,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
         if (CPPFP) {
             CPPFP<<"using _PBJ_Internal::"<<name->chars<<";\n";
         }
-        if (CSFP) {
+        if (CSFP&&0) {
             CSFP<<"using "<<name->chars<<" = _PBJ_Internal."<<name->chars<<";\n";
         }
         return;
@@ -932,7 +932,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,1)<<"}\n";
             }
             if (isMessageType) {
-                sendTabs(ctx,CSBUILD,1)<<"public Builder Set"<<uname->chars<<"(int index,"<<type->chars<<" value) {\n";
+                sendTabs(ctx,CSBUILD,1)<<"public Builder Set"<<uname->chars<<"(int index,"<<csType<<" value) {\n";
                 sendTabs(ctx,CSBUILD,2)<<"super.Set"<<uname->chars<<"(index,value._PBJSuper);\n";
                 sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
@@ -946,7 +946,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const "<<cppType<<" &value) const {\n";
                 if (isEnum) {
                     sendTabs(ctx,CSBUILD,2)<<"return super->set_"<<name->chars<<"(index,(_PBJ_Internal";
-                    sendCsNs(ctx,CSBUILD)<<"."<<SCOPE_TOP(Symbols)->message->chars<<".Types."<<type->chars<<")(value));\n";
+                    sendCsNs(ctx,CSBUILD)<<"."<<SCOPE_TOP(Symbols)->message->chars<<csType<<")(value));\n";
    
                     sendTabs(ctx,2)<<"return super->set_"<<name->chars<<"(index,(_PBJ_Internal";
                     sendCppNs(ctx,CPPFP)<<"::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")(value));\n";
@@ -1084,7 +1084,7 @@ void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumV
     int i;
     if (CPPFP){
         sendTabs(ctx,1)<<"enum "<<id->chars<<" {\n";
-        sendTabs(ctx,CSFP,1)<<"enum "<<id->chars<<" {\n";
+        sendTabs(ctx,CSFP,1)<<"public enum "<<id->chars<<" {\n";
         for (i=0;i<enumSize;i+=2) {
             pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
             sendTabs(ctx,2)<<enumVal->chars<<"=_PBJ_Internal::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<enumVal->chars<<(i+2==enumSize?"\n":",\n");            
