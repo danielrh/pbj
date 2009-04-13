@@ -485,10 +485,10 @@ public:
         return PBJ::Vector3f(0,0,1);
     }
     PBJ::Vector3f operator()(float x, float y) {
-        float neg=(x>1||y>1)?-1.0:1.0;
-        if (x>1)
+        float neg=(x>1.5||y>1.5)?-1.0:1.0;
+        if (x>1.5)
             x-=3;
-        if (y>1)
+        if (y>1.5)
             y-=3;
         
         return PBJ::Vector3f(x,y,neg-neg*sqrt(x*x+y*y));
@@ -537,10 +537,10 @@ public:
 template <> class _PBJCast<PBJ::Quaternion> {
 public:
     PBJ::Quaternion operator()(float x, float y,float z) {
-        float neg=(x>1||y>1||z>1)?-1.0:1.0;        
-        if (x>1) x-=3;
-        if (y>1) y-=3;
-        if (z>1) z-=3;
+        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;        
+        if (x>1.5) x-=3;
+        if (y>1.5) y-=3;
+        if (z>1.5) z-=3;
         return PBJ::Quaternion(x,y,z,neg-neg*sqrt(x*x+y*y+z*z),PBJ::Quaternion::XYZW());
     }
     PBJ::Quaternion operator()() {

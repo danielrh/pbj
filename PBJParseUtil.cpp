@@ -293,18 +293,31 @@ static std::ostream& sendTabs(pPBJParser ctx,std::ostream &os,int offset) {
     }
     return os;
 }
-static bool isSubMessage(pPBJParser ctx) {
+static bool isSubMessage(pPBJParser ctx, int loop_add=0) {
     int i;
-    for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
+    for (i=0;i+1-loop_add<SCOPE_SIZE(Symbols);++i) {
         if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
             return true;
         }
     }
     return false;
 }
-static std::ostream& sendCppNs(pPBJParser ctx, std::ostream&fp,const char*delim="::") {
+
+
+static bool isSymbol(pPBJParser ctx, pANTLR3_STRING type) {
     int i;
     for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
+        pANTLR3_HASH_TABLE hash=((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->types;
+        if (hash->get(hash,type)!=NULL) {
+            return true;
+        }
+    }
+    return (SCOPE_TOP(Symbols)->types->get(SCOPE_TOP(Symbols)->types,type->chars)!=NULL);
+}
+
+static std::ostream& sendCppNs(pPBJParser ctx, std::ostream&fp,const char*delim="::", int loop_add=0) {
+    int i;
+    for (i=0;i+1-loop_add<SCOPE_SIZE(Symbols);++i) {
         if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
             fp<<delim<<((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message->chars;
         }
@@ -326,8 +339,8 @@ static std::ostream& sendHashNs(pPBJParser ctx, std::ostream&fp) {
     }
     return fp;
 }
-static std::ostream& sendCsNs(pPBJParser ctx,  std::ostream&fp,const char*delim=".") {
-    return sendCppNs(ctx,fp,delim);
+static std::ostream& sendCsNs(pPBJParser ctx,  std::ostream&fp,const char*delim=".", int loop_add=0) {
+    return sendCppNs(ctx,fp,delim,loop_add);
 }
 void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
@@ -425,7 +438,7 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,CSFP,2)<<"}\n";
 
         sendTabs(ctx,CSFP,2)<<"public static "<<id->chars<<" defaultInstance= new "<<id->chars<<" (_PBJ_Internal";
-        sendCsNs(ctx,CSFP)<<"."<<id->chars<<".DefaultInstance);\n";
+        sendCsNs(ctx,CSFP)<<(subMessage?".Types.":".")<<id->chars<<".DefaultInstance);\n";
         sendTabs(ctx,CSFP,2)<<"public static "<<id->chars<<" DefaultInstance{\n";
         sendTabs(ctx,CSFP,3)<<"get {return defaultInstance;}\n";
         sendTabs(ctx,CSFP,2)<<"}\n";
@@ -435,6 +448,9 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendCsNs(ctx,CSFP)<<(subMessage?".Types.":".")<<id->chars<<".Descriptor; }";
         sendTabs(ctx,CSFP,2)<<"}\n";    
         sendTabs(ctx,CSFP,2)<< "public static class Types {\n";
+
+
+
         
     }
 }
@@ -535,7 +551,7 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
     if (strcmp((char*)type->chars,"vector2f")==0)
         return "PBJ.Vector2f";        
     if (strcmp((char*)type->chars,"vector2d")==0)
-        return "PBJ.Vector2f";        
+        return "PBJ.Vector2d";        
     if (strcmp((char*)type->chars,"quaternion")==0)
         return "PBJ.Quaternion";
     if (strcmp((char*)type->chars,"vector3f")==0)
@@ -722,9 +738,54 @@ std::ostream& printFlags(std::ostream&fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3
     }
     return fp;
 }
+std::ostream& printCsFlags(std::ostream&fp, pANTLR3_HASH_TABLE flag_all_on,pANTLR3_STRING name) {
+    pANTLR3_STRING all_on =((pANTLR3_STRING)(flag_all_on->get(flag_all_on,name->chars)));
+    if (all_on) {
+    const char*cur=(const char*)all_on->chars;
+    const char *where=strchr((const char*)all_on->chars,'|');
+    bool first=true;
+    if (where==NULL) where=cur+all_on->len;
+    do {
+        if (*cur!='\0'&&where>cur&&!(cur[0]>='0'&&cur[0]<='9')) {
+            if (!first){
+                fp<<"|";
+            }
+            fp<<"(ulong)Types."<<name->chars<<".";
+            fp.write((const char*)cur+1,where-cur-1);
+            first=false;
+        }
+        cur=where;
+        if (*where!='\0') {
+            where=strchr((const char*)cur+1,'|');
+        }else{
+            where=NULL;
+        }
+        if (where==NULL) where=(const char*)all_on->chars+all_on->len;
+    }while(*cur);
+    }else {
+        fprintf (stderr,"Invalid flags value %s\n",name->chars);
+    }
+    return fp;
+}
 pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
     pANTLR3_STRING uname=stringDup(name);
+    bool reset=false;
     uname->chars[0]=toupper(name->chars[0]);
+    return uname;
+}
+pANTLR3_STRING toVarUpper(pANTLR3_STRING name) {
+    pANTLR3_STRING uname=stringDup(name);
+    bool reset=false;
+    uname->chars[0]=toupper(name->chars[0]);
+    for (int i=1;i<uname->len;++i) {
+        if (reset) {
+            uname->chars[i]=toupper(name->chars[i]);            
+            reset=false;
+        }
+        if (uname->chars[i]>='0'&&uname->chars[i]<='9'){
+            reset=true;
+        }
+    }
     return uname;
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isRequired, int isMultiplicitiveAdvancedType){
@@ -740,7 +801,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
         }
         return;
     }
-    pANTLR3_STRING uname=toFirstUpper(name);
+    pANTLR3_STRING uname=toVarUpper(name);
     pANTLR3_STRING utype=toFirstUpper(type);
     pANTLR3_STRING cstype=type->factory->newRaw(type->factory);
     const char * cppType=getCppType(ctx,type);
@@ -748,51 +809,55 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
     const char * pbjType=getPBJType(ctx,type);
     int isEnum = SCOPE_TOP(Symbols)->enum_sizes->get(SCOPE_TOP(Symbols)->enum_sizes,type->chars)!=NULL;
     int isFlag = SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)!=NULL;
-    int isMessageType=((SCOPE_TOP(Symbols)->types->get(SCOPE_TOP(Symbols)->types,type->chars)!=NULL)&&!isEnum)&&!isFlag;
+    int isMessageType=(isSymbol(ctx,type)&&!isEnum)&&!isFlag;
+    int isSubMessage=((SCOPE_TOP(Symbols)->types->get(SCOPE_TOP(Symbols)->types,type->chars)!=NULL)&&!isEnum)&&!isFlag;
     int isRepeated=!notRepeated;
     std::stringstream csShared;
     if (CPPFP) {
         sendTabs(ctx,1)<<"inline void clear_"<<name->chars<<"() {return super->clear_"<<name->chars<<"();}\n";
     }
     if (CSFP) {
-        sendTabs(ctx,CSBUILD,1)<<"public Builder Clear"<<uname->chars<<"() { return super->Clear"<<uname->chars<<"();return this;}\n";
+        sendTabs(ctx,CSBUILD,1)<<"public Builder Clear"<<uname->chars<<"() { super.Clear"<<uname->chars<<"();return this;}\n";
     }
     if (isMultiplicitiveAdvancedType) {
         int numItemsPerElement=getNumItemsPerElement(ctx,type);
         if (CPPFP) {
             int i;
             if (isRepeated) {
-                sendTabs(ctx,csShared,1)<<"public int "<<uname->chars<<"Count { get { return super->"<<uname->chars<<"Count/"<<numItemsPerElement<<";} }\n";
+                sendTabs(ctx,csShared,1)<<"public int "<<uname->chars<<"Count { get { return super."<<uname->chars<<"Count/"<<numItemsPerElement<<";} }\n";
                 sendTabs(ctx,1)<<"inline int "<<name->chars<<"_size() const {return super->"<<name->chars<<"_size()/"<<numItemsPerElement<<";}\n";
 
                 sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) { return true; }\n";
                 sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index<"<<name->chars<<"_size()&&index>=0);return true;}\n";
             }else {
                 sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->"<<name->chars<<"_size()>="<<numItemsPerElement<<";}\n";
-                sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super->"<<uname->chars<<"Count>="<<numItemsPerElement<<";} }\n";
+                sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super."<<uname->chars<<"Count>="<<numItemsPerElement<<";} }\n";
             }
-            sendTabs(ctx,csShared,1)<<csType<<" "<<uname->chars<<(isRepeated?"(int index)":"{ get ")<<" {\n";
+            sendTabs(ctx,csShared,1)<<csType<<(isRepeated?" ":" Get")<<uname->chars<<(isRepeated?"(int index)":"{ get ")<<" {\n";
+            if (!isRepeated) {
+                sendTabs(ctx,csShared,2)<<"int index=0;\n";
+            }
             sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<(isRepeated?"(index)":"")<<") {\n";
-            sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<utype->chars<<"(";
+            sendTabs(ctx,csShared,3)<<"return PBJ._PBJ.Cast"<<utype->chars<<"(";
             sendTabs(ctx,1)<<"inline "<<cppType<<" "<<name->chars<<"("<<(isRepeated?"int index":"")<<") const {\n";
             sendTabs(ctx,2)<<"if (has_"<<name->chars<<"("<<(isRepeated?"index":"")<<")) {\n";
             sendTabs(ctx,3)<<"return _PBJCast< "<<pbjType<<">()(";
             for (i=0;i<numItemsPerElement;++i) {
                 if (isRepeated) {
-                    csShared<<"super->"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
+                    csShared<<"super.Get"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
                     CPPFP<<"super->"<<name->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
                 }else {
-                    csShared<<"super->"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
+                    csShared<<"super.Get"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
                     CPPFP<<"super->"<<name->chars<<"("<<i<<")"<<(i+1==numItemsPerElement?");\n":",");
                 }
             }
             sendTabs(ctx,csShared,2)<<"} else {\n";            
             sendTabs(ctx,2)<<"} else {\n";
             if (value) {
-                sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");";
+                sendTabs(ctx,csShared,3)<<"return "/*<<"new "<<csType<<"("*/<<value->chars/*<<")"*/<<";";
                 sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");";
             }else {
-                sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<utype->chars<<"();\n";
+                sendTabs(ctx,csShared,3)<<"return PBJ._PBJ.Cast"<<utype->chars<<"();\n";
                 sendTabs(ctx,3)<<"return _PBJCast< "<<pbjType<<">()();\n";
             }
             sendTabs(ctx,2)<<"}\n";
@@ -813,13 +878,16 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             sendTabs(ctx,1)<<"inline void "<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(const "<<cppType<<" &value) {\n";
             if (!isRepeated){
                 sendTabs(ctx,2)<<"super->clear_"<<name->chars<<"();\n";
-                sendTabs(ctx,CSBUILD,2)<<"super->Clear"<<uname->chars<<"();\n";
+                sendTabs(ctx,CSBUILD,2)<<"super.Clear"<<uname->chars<<"();\n";
             }
             sendTabs(ctx,2)<<"_PBJConstruct< "<<pbjType<<">::ArrayType _PBJtempArray=_PBJConstruct< "<<pbjType<<">()(value);\n";
-            sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=_PBJConstruct"<<utype->chars<<"(value);\n";
+            sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=PBJ._PBJ.Construct"<<utype->chars<<"(value);\n";
             for (i=0;i<numItemsPerElement;++i) {
                 sendTabs(ctx,2)<<"super->add_"<<name->chars<<"(_PBJtempArray["<<i<<"]);\n";
-                sendTabs(ctx,CSBUILD,2)<<"super->Add"<<uname->chars<<"(_PBJtempArray["<<i<<"]);\n";
+                sendTabs(ctx,CSBUILD,2)<<"super.Add"<<uname->chars<<"(_PBJtempArray["<<i<<"]);\n";
+            }
+            if (isRepeated) {
+                sendTabs(ctx,CSBUILD,2)<<"return this;\n";
             }
             sendTabs(ctx,CSBUILD,1)<<"}\n";
             sendTabs(ctx,1)<<"}\n";
@@ -831,11 +899,12 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const "<<cppType<<" &value) {\n";
                 sendTabs(ctx,2)<<"_PBJConstruct< "<<pbjType<<">::ArrayType _PBJtempArray=_PBJConstruct< "<<pbjType<<">()(value);\n";
                 sendTabs(ctx,CSBUILD,1)<<"Builder Set"<<uname->chars<<"(int index,"<<csType<<" value) {\n";
-                sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=_PBJConstruct"<<utype->chars<<"(value);\n";
+                sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=PBJ._PBJ.Construct"<<utype->chars<<"(value);\n";
                 for (i=0;i<numItemsPerElement;++i) {
                     sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<",_PBJtempArray["<<i<<"]);\n";
-                    sendTabs(ctx,CSBUILD,2)<<"super->Set"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<",_PBJtempArray["<<i<<"]);\n";
+                    sendTabs(ctx,CSBUILD,2)<<"super.Set"<<uname->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<",_PBJtempArray["<<i<<"]);\n";
                 }
+                sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
                 sendTabs(ctx,1)<<"}\n";
             }
@@ -883,14 +952,14 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
 
 
                     sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) const {\n";
-                    sendTabs(ctx,csShared,2)<<"return PBJ._PBJValidateFlags(super."<<uname->chars<<"(index),";
+                    sendTabs(ctx,csShared,2)<<"return PBJ._PBJ.ValidateFlags(super.Get"<<uname->chars<<"(index),";
                                         
-                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    printCsFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
                     sendTabs(ctx,csShared,1)<<"}\n";
 
                 }else {
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index>=0&&index<"<<name->chars<<"_size()); return _PBJValidate< "<<pbjType<<">()(super->"<<name->chars<<"(index));}\n";
-                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) {return PBJ._PBJValidate"<<utype->chars<<"(super."<<uname->chars<<"(index));}\n";
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) {return PBJ._PBJ.Validate"<<utype->chars<<"(super.Get"<<uname->chars<<"(index));}\n";
                 }
                 sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"(int index) {\n";
                 sendTabs(ctx,1)<<"inline "<<(isRawByteArray?"const std::string&":cppType)<<" "<<name->chars<<"(int index) const {\n";
@@ -900,30 +969,30 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 }
                 if (isMessageType) {
                     sendTabs(ctx,value?3:2)<<"return "<<cppType<<"(super->"<<name->chars<<"(index));\n";//FIXME:cast
-                    sendTabs(ctx,csShared,value?3:2)<<"return "<<type->chars<<"(super."<<uname->chars<<"(index));\n";//FIXME:cast
+                    sendTabs(ctx,csShared,value?3:2)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super.Get"<<uname->chars<<"(index));\n";//FIXME:cast
                 } else if (isFlag) {
                     sendTabs(ctx,value?3:2)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(index),";
                     printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
 
-                    sendTabs(ctx,csShared,value?3:2)<<"return PBJ._PBJCastFlags"<<utype->chars<<"(super."<<name->chars<<"(index),";
-                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,csShared,value?3:2)<<"return PBJ._PBJ.CastFlags(super.Get"<<uname->chars<<"(index),";
+                    printCsFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
                 } else if (isEnum) {
                     sendTabs(ctx,value?3:2)<<"return ("<<type->chars<<")(super->"<<name->chars<<"(index))\n;";
-                    sendTabs(ctx,csShared,value?3:2)<<"return ("<<type->chars<<")(super."<<uname->chars<<"(index))\n;";
+                    sendTabs(ctx,csShared,value?3:2)<<"return ("<<type->chars<<")(super.Get"<<uname->chars<<"(index))\n;";
 
                 } else {
                     sendTabs(ctx,value?3:2)<<"return _PBJCast< "<<pbjType<<">()(super->"<<name->chars<<"(index));\n";
-                    sendTabs(ctx,csShared,value?3:2)<<"return ("<<csType<<")_PBJCast"<<utype->chars<<"(super->"<<name->chars<<"(index));\n";
+                    sendTabs(ctx,csShared,value?3:2)<<"return ("<<csType<<")PBJ._PBJ.Cast"<<utype->chars<<"(super.Get"<<uname->chars<<"(index));\n";
                 }
                 if (value) {
                     sendTabs(ctx,2)<<"} else {\n";
                     sendTabs(ctx,csShared,2)<<"} else {\n";
                     if(value) {
                         sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
-                        sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");\n";
+                        sendTabs(ctx,csShared,3)<<"return "/*<<"new "<<csType<<"("*/<<value->chars/*<<")"*/<<";\n";
                     }else {
                         sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast"<<(isMessageType?"Message":"")<<"< "<<pbjType<<">()();\n";
-                        sendTabs(ctx,csShared,value?3:2)<<"return _PBJCast"<<utype->chars<<"();\n";
+                        sendTabs(ctx,csShared,value?3:2)<<"return "<<(isMessageType?(isSubMessage?"new Types.":"new "):"PBJ._PBJ.Cast")<<utype->chars<<"();\n";
                     }
                     sendTabs(ctx,2)<<"}\n";
                     sendTabs(ctx,csShared,2)<<"}\n";
@@ -945,16 +1014,16 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 
                 sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const "<<cppType<<" &value) const {\n";
                 if (isEnum) {
-                    sendTabs(ctx,CSBUILD,2)<<"return super->set_"<<name->chars<<"(index,(_PBJ_Internal";
-                    sendCsNs(ctx,CSBUILD)<<"."<<SCOPE_TOP(Symbols)->message->chars<<csType<<")(value));\n";
+                    sendTabs(ctx,CSBUILD,2)<<"return super.Set"<<uname->chars<<"(index,(_PBJ_Internal";
+                    sendCsNs(ctx,CSBUILD)<<".Types."<<SCOPE_TOP(Symbols)->message->chars<<csType<<")(value));\n";
    
                     sendTabs(ctx,2)<<"return super->set_"<<name->chars<<"(index,(_PBJ_Internal";
                     sendCppNs(ctx,CPPFP)<<"::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")(value));\n";
                 }else {
                     if (isFlag) {
-                        sendTabs(ctx,CSBUILD,2)<<"super->Set"<<uname->chars<<"(index,value);\n";
+                        sendTabs(ctx,CSBUILD,2)<<"super.Set"<<uname->chars<<"(index,value);\n";
                     }else {
-                        sendTabs(ctx,CSBUILD,2)<<"super->Set"<<uname->chars<<"(index,_PBJConstruct"<<type->chars<<"(value));\n";
+                        sendTabs(ctx,CSBUILD,2)<<"super.Set"<<uname->chars<<"(index,PBJ._PBJ.Construct(value));\n";
                     }
                     sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                     sendTabs(ctx,2)<<"return super->set_"<<name->chars<<"(index,_PBJConstruct< "<<pbjType<<">()(value));\n";
@@ -977,7 +1046,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 }
                 if (isMessageType||isEnum) {
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->has_"<<name->chars<<"();}\n";
-                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super->Has"<<uname->chars<<";} }\n";
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super.Has"<<uname->chars<<";} }\n";
                 }else if (isFlag) {
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {\n";
                     sendTabs(ctx,2)<<"if (!super->has_"<<name->chars<<"()) return false;\n";
@@ -986,14 +1055,14 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,1)<<"}\n";
 
                     sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<" { get {\n";
-                    sendTabs(ctx,csShared,2)<<"if (!super->Has"<<uname->chars<<") return false;\n";
-                    sendTabs(ctx,csShared,2)<<"return PBJ._PBJValidateFlags"<<type->chars<<"()(super."<<name->chars<<",";
-                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,csShared,2)<<"if (!super.Has"<<uname->chars<<") return false;\n";
+                    sendTabs(ctx,csShared,2)<<"return PBJ._PBJ.ValidateFlags(super."<<uname->chars<<",";
+                    printCsFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
                     sendTabs(ctx,csShared,1)<<"} }\n";
 
 
                 }else {
-                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super->Has"<<uname->chars<<"&&PBJ._PBJValidate"<<utype->chars<<"(super."<<uname->chars<<");} }\n";
+                    sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super.Has"<<uname->chars<<"&&PBJ._PBJ.Validate"<<utype->chars<<"(super."<<uname->chars<<");} }\n";
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->has_"<<name->chars<<"()&&_PBJValidate<"<<pbjType<<">()(super->"<<name->chars<<"());}\n";
                 }
 
@@ -1004,25 +1073,37 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<") {\n";
                 if (isMessageType) {
                     sendTabs(ctx,3)<<"return "<<type->chars<<"(super->"<<name->chars<<"());\n";
-                    sendTabs(ctx,csShared,3)<<"return new "<<type->chars<<"(super."<<name->chars<<"());\n";
+                    sendTabs(ctx,csShared,3)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super."<<uname->chars<<");\n";
+                } else if (isEnum) {
+                    sendTabs(ctx,csShared,3)<<"return (Types."<<type->chars<<")super."<<uname->chars<<";\n";
                 } else if (isFlag) {
                     sendTabs(ctx,3)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(),";
                     printFlags(CPPFP,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
                     
-                    sendTabs(ctx,csShared,3)<<"return PBJ._PBJCastFlags(super."<<name->chars<<"(),";
-                    printFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
+                    sendTabs(ctx,csShared,3)<<"return ("<<csType<<")PBJ._PBJ.CastFlags(super."<<uname->chars<<",";
+                    printCsFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";
                 } else {
                     sendTabs(ctx,3)<<"return ("<<cppType<<")_PBJCast< "<<pbjType<<">()(super->"<<name->chars<<"());\n";
-                    sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<utype->chars<<"(super."<<name->chars<<"());\n";
+                    sendTabs(ctx,csShared,3)<<"return PBJ._PBJ.Cast"<<utype->chars<<"(super."<<uname->chars<<");\n";
                 }
                 sendTabs(ctx,2)<<"} else {\n";
                 sendTabs(ctx,csShared,2)<<"} else {\n";
                 if(value) {
                     sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
-                    sendTabs(ctx,csShared,3)<<"return new "<<csType<<"("<<value->chars<<");\n";
+                    sendTabs(ctx,csShared,3)<<"return "/*<<"new "<<csType<<"("*/<<value->chars/*<<")"*/<<";\n";
                 }else {
-                    sendTabs(ctx,csShared,3)<<"return PBJ._PBJCast"<<utype->chars<<"();\n";
                     sendTabs(ctx,3)<<"return _PBJCast"<<(isMessageType?"Message":"")<<" < "<<pbjType<<"> ()();\n";
+                    if (isEnum||isFlag) {
+                        if (isEnum) {
+                            sendTabs(ctx,csShared,3)<<"return new Types."<<type->chars<<"();\n";
+                        }else {
+                            sendTabs(ctx,csShared,3)<<"return ("<<csType<<")PBJ._PBJ.CastFlags(";
+                            printCsFlags(csShared,SCOPE_TOP(Symbols)->flag_all_on,type)<<");\n";                            
+                        }
+                    }else{
+                    sendTabs(ctx,csShared,3)<<"return "<<(isMessageType?(isSubMessage?"new Types.":"new "):"PBJ._PBJ.Cast")<<utype->chars<<"();\n";
+
+                    }
                 }
                 sendTabs(ctx,2)<<"}\n";
                 sendTabs(ctx,csShared,2)<<"}\n";
@@ -1039,12 +1120,13 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
         //set or add
         if (isMessageType) {
             if (isRepeated) {
-                sendTabs(ctx,CSBUILD,1)<<csType<<" Add"<<uname->chars<<"() {\n";
-                sendTabs(ctx,CSBUILD,1)<<"return super."<<"Add"<<uname->chars<<"();\n";
+                sendTabs(ctx,CSBUILD,1)<<"Builder Add"<<uname->chars<<"("<<csType<<" value ) {\n";
+                sendTabs(ctx,CSBUILD,2)<<"super."<<"Add"<<uname->chars<<"(value._PBJSuper);\n";
+                sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
             }else {                                                                                                     
                 sendTabs(ctx,CSBUILD,1)<<"set {\n";
-                sendTabs(ctx,CSBUILD,1)<<"return super."<<uname->chars<<"=value._PBJSuper;\n";
+                sendTabs(ctx,CSBUILD,2)<<"super."<<uname->chars<<"=value._PBJSuper;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
             }
             sendTabs(ctx,1)<<"inline "<<cppType<<" "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
@@ -1052,7 +1134,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             sendTabs(ctx,1)<<"}\n";
         }else {
             if (isRepeated) {
-                sendTabs(ctx,CSBUILD,1)<<csType<<" Add"<<uname->chars<<"() {\n";
+                sendTabs(ctx,CSBUILD,1)<<"Builder Add"<<uname->chars<<"("<<csType<<" value) {\n";
             }else {
                 sendTabs(ctx,CSBUILD,1)<<"set {\n";
             }
@@ -1060,14 +1142,17 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             if (isEnum) {
                 sendTabs(ctx,2)<<"super->"<<(isRepeated?"add":"set")<<"_"<<name->chars<<"((_PBJ_Internal";
                 sendCppNs(ctx,CPPFP)<<"::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")value);\n";
-                sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<name->chars<<(isRepeated?"":"=")<<"((_PBJ_Internal";
-                sendCsNs(ctx,CSBUILD)<<"."<<SCOPE_TOP(Symbols)->message->chars<<".Types."<<type->chars<<")value);\n";
+                sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<uname->chars<<(isRepeated?"":"=")<<"((_PBJ_Internal";
+                sendCsNs(ctx,CSBUILD)<<".Types."<<type->chars<<")value);\n";
 
             }else {
-                sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<name->chars<<(isRepeated?"":"=")<<(isFlag?"((":"(PBJ._PBJ_Construct(")<<"value));\n";
+                sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<uname->chars<<(isRepeated?"":"=")<<(isFlag?"((":"(PBJ._PBJ.Construct(")<<"value));\n";
                 sendTabs(ctx,2)<<"super->"<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(_PBJConstruct< "<<pbjType<<">()(value));\n";
             }
             sendTabs(ctx,1)<<"}\n";
+            if (isRepeated) {
+                sendTabs(ctx,CSBUILD,2)<<"return this;\n";
+            }
             sendTabs(ctx,CSBUILD,1)<<"}\n";
         }
         if (!isRepeated) {
@@ -1088,7 +1173,7 @@ void printEnum(pPBJParser ctx, int offset, pANTLR3_STRING id, pANTLR3_LIST enumV
         for (i=0;i<enumSize;i+=2) {
             pANTLR3_STRING enumVal=((pANTLR3_STRING)(enumValues->get(enumValues,i)));
             sendTabs(ctx,2)<<enumVal->chars<<"=_PBJ_Internal::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<enumVal->chars<<(i+2==enumSize?"\n":",\n");            
-            sendTabs(ctx,CSFP,2)<<enumVal->chars<<"=_PBJ_Internal."<<SCOPE_TOP(Symbols)->message->chars<<".Types."<<enumVal->chars<<(i+2==enumSize?"\n":",\n");            
+            sendTabs(ctx,CSFP,2)<<enumVal->chars<<"=_PBJ_Internal."<<SCOPE_TOP(Symbols)->message->chars<<".Types."<<id->chars<<"."<<enumVal->chars<<(i+2==enumSize?"\n":",\n");            
         }
         sendTabs(ctx,1)<<"};\n";
         sendTabs(ctx,CSFP,1)<<"};\n";
@@ -1180,15 +1265,22 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
             int i;
             int size=reqAdv->size(reqAdv);
             for (i=0;i<size;++i) {
-                pANTLR3_STRING s=toFirstUpper((pANTLR3_STRING)reqAdv->get(reqAdv,i));
-                sendTabs(ctx,CSFP,3)<<"&&Has"<<s<<"\n";
+                pANTLR3_STRING s=toVarUpper((pANTLR3_STRING)reqAdv->get(reqAdv,i));
+                sendTabs(ctx,CSFP,3)<<"&&Has"<<s->chars<<"\n";
                 stringFree(s);
             }
             sendTabs(ctx,CSFP,3)<<";\n";            
         }
-        sendTabs(ctx,CSFP,1)<<"}";
+        sendTabs(ctx,CSFP,1)<<"}\n";
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csMembers->str();
+        bool subMessage=isSubMessage(ctx,-1);
+
         sendTabs(ctx,CSFP,1)<<"class Builder {\n";//types
+
+        sendTabs(ctx,CSFP,2)<<"protected _PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".Builder super;\n";
+        sendTabs(ctx,CSFP,2)<<"public _PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".Builder _PBJSuper{ get { return super;} }\n";
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csBuild->str();
         sendTabs(ctx,CSFP,1)<<"}\n";
         sendTabs(ctx,CSFP,0)<<"}\n";
