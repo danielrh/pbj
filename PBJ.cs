@@ -1,8 +1,38 @@
 using System;
 namespace PBJ {
 
-public class Message {
+public class IMessage {
+    public virtual Google.ProtocolBuffers.IMessage _PBJISuper { get { return null;} }
+    protected virtual bool _HasAllPBJFields { get { return true; } }
+    public void WriteTo(Google.ProtocolBuffers.CodedOutputStream output){
+        _PBJISuper.WriteTo(output);
+    }
+    public override bool Equals (object other){
+        return _PBJISuper.Equals(other);
+    }
+    public int SerializedSize { get { return _PBJISuper.SerializedSize; } } 
 
+    public override int GetHashCode() {return _PBJISuper.GetHashCode();}
+
+    public override string ToString() {
+        return _PBJISuper.ToString();
+    }
+    public virtual IBuilder WeakCreateBuilderForType() { return null;}
+    public Google.ProtocolBuffers.ByteString ToByteString () {
+        return _PBJISuper.ToByteString();
+    }
+    public byte[] ToByteArray () {
+        return _PBJISuper.ToByteArray();
+    }
+    public void WriteTo(global::System.IO.Stream output) {
+        _PBJISuper.WriteTo(output);
+    }
+//    Google.ProtocolBuffers.MessageDescriptor DescriptorForType { get {return _PBJISuper.DescriptorForType;} }
+    public Google.ProtocolBuffers.UnknownFieldSet UnknownFields { get { return _PBJISuper.UnknownFields;} }
+    public class IBuilder {
+        public virtual Google.ProtocolBuffers.IBuilder _PBJISuper { get { return null;} }
+        protected virtual bool _HasAllPBJFields { get { return true; } }
+    }
 }
 
 public struct Vector2f {

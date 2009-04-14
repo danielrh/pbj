@@ -3,7 +3,7 @@ tpbj: output.pbj.hpp output.pb.h test.cpp pbj.hpp cspbj.exe
 	g++ -std=c++98 -g -o tpbj test.cpp output.pb.cc ${SIRIKATA}/dependencies/protobufs/lib/libprotobuf.a -Wall -I${SIRIKATA}/dependencies/include	-I${SIRIKATA}/libcore/src -I${SIRIKATA}//dependencies/include -I${SIRIKATA}/dependencies/include/boost-1_35 -I${SIRIKATA}/dependencies/include/boost-1_37
 
 cspbj.exe: Output.pbj.cs Output.cs Test.cs pbj.hpp
-	${SIRIKATA}/dependencies/bin/gmcs -r:${SIRIKATA}/dependencies/lib/Google.ProtocolBuffers.dll Output.pbj.cs Output.cs Test.cs PBJ.cs
+	${SIRIKATA}/dependencies/installed-mono/bin/gmcs -r:${SIRIKATA}/dependencies/lib/Google.ProtocolBuffers.dll Output.pbj.cs Output.cs Test.cs PBJ.cs
 Output.cs:output.proto
 	${SIRIKATA}/dependencies/bin/protoc --csharp_out=. output.proto
 output.pb.h: output.pbj.hpp

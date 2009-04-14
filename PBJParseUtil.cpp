@@ -422,7 +422,7 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,2)<<id->chars<<"* New()const{ return new "<<id->chars<<"; }\n";
     }
     if (CSFP) {
-        sendTabs(ctx,CSFP,1)<<"public class "<<id->chars<<" : PBJ.Message {\n";
+        sendTabs(ctx,CSFP,1)<<"public class "<<id->chars<<" : PBJ.IMessage {\n";
         sendTabs(ctx,CSFP,2)<<"protected _PBJ_Internal";
         sendCsNs(ctx,CSFP)<<(subMessage?".Types.":".")<<id->chars<<" super;\n";
         sendTabs(ctx,CSFP,2)<<"public _PBJ_Internal";
@@ -833,7 +833,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"() const {return super->"<<name->chars<<"_size()>="<<numItemsPerElement<<";}\n";
                 sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"{ get {return super."<<uname->chars<<"Count>="<<numItemsPerElement<<";} }\n";
             }
-            sendTabs(ctx,csShared,1)<<csType<<(isRepeated?" ":" Get")<<uname->chars<<(isRepeated?"(int index)":"{ get ")<<" {\n";
+            sendTabs(ctx,csShared,1)<<"public "<<csType<<(isRepeated?" Get":" ")<<uname->chars<<(isRepeated?"(int index)":"{ get ")<<" {\n";
             if (!isRepeated) {
                 sendTabs(ctx,csShared,2)<<"int index=0;\n";
             }
@@ -872,7 +872,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             if (isRepeated==false) {//need a getter which needs an xtra brace  and then a setter
                 sendTabs(ctx,CSBUILD,1)<<"set {\n";
             }else {
-                sendTabs(ctx,CSBUILD,1)<<"Builder Add"<<uname->chars<<"("<<csType<<" value) {\n";
+                sendTabs(ctx,CSBUILD,1)<<"public Builder Add"<<uname->chars<<"("<<csType<<" value) {\n";
             }
 
             sendTabs(ctx,1)<<"inline void "<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(const "<<cppType<<" &value) {\n";
@@ -898,7 +898,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             if (isRepeated) {
                 sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const "<<cppType<<" &value) {\n";
                 sendTabs(ctx,2)<<"_PBJConstruct< "<<pbjType<<">::ArrayType _PBJtempArray=_PBJConstruct< "<<pbjType<<">()(value);\n";
-                sendTabs(ctx,CSBUILD,1)<<"Builder Set"<<uname->chars<<"(int index,"<<csType<<" value) {\n";
+                sendTabs(ctx,CSBUILD,1)<<"public Builder Set"<<uname->chars<<"(int index,"<<csType<<" value) {\n";
                 sendTabs(ctx,CSBUILD,2)<<getArrayType(ctx,type)<<"[] _PBJtempArray=PBJ._PBJ.Construct"<<utype->chars<<"(value);\n";
                 for (i=0;i<numItemsPerElement;++i) {
                     sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(index*"<<numItemsPerElement<<"+"<<i<<",_PBJtempArray["<<i<<"]);\n";
@@ -1120,7 +1120,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
         //set or add
         if (isMessageType) {
             if (isRepeated) {
-                sendTabs(ctx,CSBUILD,1)<<"Builder Add"<<uname->chars<<"("<<csType<<" value ) {\n";
+                sendTabs(ctx,CSBUILD,1)<<"public Builder Add"<<uname->chars<<"("<<csType<<" value ) {\n";
                 sendTabs(ctx,CSBUILD,2)<<"super."<<"Add"<<uname->chars<<"(value._PBJSuper);\n";
                 sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
@@ -1134,7 +1134,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             sendTabs(ctx,1)<<"}\n";
         }else {
             if (isRepeated) {
-                sendTabs(ctx,CSBUILD,1)<<"Builder Add"<<uname->chars<<"("<<csType<<" value) {\n";
+                sendTabs(ctx,CSBUILD,1)<<"public Builder Add"<<uname->chars<<"("<<csType<<" value) {\n";
             }else {
                 sendTabs(ctx,CSBUILD,1)<<"set {\n";
             }
@@ -1259,29 +1259,104 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
         int i;
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csType->str();
         sendTabs(ctx,CSFP,1)<<"}\n";//types
-        sendTabs(ctx,CSFP,1)<<"protected bool _HasAllPBJFields() {\n";//types
-        sendTabs(ctx,CSFP,2)<<"return true\n";
-        {
-            int i;
-            int size=reqAdv->size(reqAdv);
-            for (i=0;i<size;++i) {
-                pANTLR3_STRING s=toVarUpper((pANTLR3_STRING)reqAdv->get(reqAdv,i));
-                sendTabs(ctx,CSFP,3)<<"&&Has"<<s->chars<<"\n";
-                stringFree(s);
-            }
-            sendTabs(ctx,CSFP,3)<<";\n";            
-        }
-        sendTabs(ctx,CSFP,1)<<"}\n";
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csMembers->str();
         bool subMessage=isSubMessage(ctx,-1);
+        sendTabs(ctx,CSFP,2)<<"public override Google.ProtocolBuffers.IMessage _PBJISuper { get { return super; } }\n";
+        sendTabs(ctx,CSFP,1)<<"public override PBJ.IMessage.IBuilder WeakCreateBuilderForType() { return new Builder(); }\n";
+        sendTabs(ctx,CSFP,1)<<"public static Builder CreateBuilder() { return new Builder(); }\n";
+        sendTabs(ctx,CSFP,1)<<"public static Builder CreateBuilder("<<id->chars<<" prototype) {\n";
+        sendTabs(ctx,CSFP,2)<<"return (Builder)new Builder().MergeFrom(prototype);\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";        
 
-        sendTabs(ctx,CSFP,1)<<"class Builder {\n";//types
-
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(pb::ByteString data) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(pb::ByteString data, pb::ExtensionRegistry er) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data,er));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(byte[] data) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(byte[] data, pb::ExtensionRegistry er) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data,er));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(global::System.IO.Stream data) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(global::System.IO.Stream data, pb::ExtensionRegistry er) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data,er));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(pb::CodedInputStream data) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        
+        sendTabs(ctx,CSFP,1)<<"public static "<<id->chars<<" ParseFrom(pb::CodedInputStream data, pb::ExtensionRegistry er) {\n";
+        sendTabs(ctx,CSFP,2)<<"return new "<<id->chars<<"(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".ParseFrom(data,er));\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+        for (int pbjfields=0;pbjfields<2;++pbjfields) {
+            sendTabs(ctx,CSFP,1)<<"protected override bool _HasAllPBJFields{ get {\n";
+            sendTabs(ctx,CSFP,2)<<"return true\n";
+            {
+                int i;
+                int size=reqAdv->size(reqAdv);
+                for (i=0;i<size;++i) {
+                    pANTLR3_STRING s=toVarUpper((pANTLR3_STRING)reqAdv->get(reqAdv,i));
+                    sendTabs(ctx,CSFP,3)<<"&&Has"<<s->chars<<"\n";
+                    stringFree(s);
+                }
+                sendTabs(ctx,CSFP,3)<<";\n";            
+            }
+            sendTabs(ctx,CSFP,1)<<"} }\n";
+            sendTabs(ctx,CSFP,1)<<"public bool IsInitialized { get {\n";
+            sendTabs(ctx,CSFP,2)<<"return super.IsInitialized&&_HasAllPBJFields;\n";
+            sendTabs(ctx,CSFP,1)<<"} }\n";
+            if (pbjfields==0){
+                sendTabs(ctx,CSFP,1)<<"public class Builder : global::PBJ.IMessage.IBuilder{\n";//types
+            }
+        }
         sendTabs(ctx,CSFP,2)<<"protected _PBJ_Internal";
         sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".Builder super;\n";
+        sendTabs(ctx,CSFP,2)<<"public override Google.ProtocolBuffers.IBuilder _PBJISuper { get { return super; } }\n";
+
         sendTabs(ctx,CSFP,2)<<"public _PBJ_Internal";
         sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".Builder _PBJSuper{ get { return super;} }\n";
+        sendTabs(ctx,CSFP,2)<<"public Builder() {super = new _PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".Builder();}\n";
+        sendTabs(ctx,CSFP,2)<<"public Builder(_PBJ_Internal";
+        sendCsNs(ctx,CSFP,".",-1)<<(subMessage?".Types.":".")<<id->chars<<".Builder other) {\n";
+        sendTabs(ctx,CSFP,3)<<"super=other;\n";
+        sendTabs(ctx,CSFP,2)<<"}\n";
+        
+        sendTabs(ctx,CSFP,2)<<"public Builder Clone() {return new Builder(super.Clone());}\n";
+        sendTabs(ctx,CSFP,2)<<"public Builder MergeFrom("<<id->chars<<" prototype) { super.MergeFrom(prototype._PBJSuper);return this;}\n";
+        sendTabs(ctx,CSFP,2)<<"public Builder Clear() {super.Clear();return this;}\n";
+        sendTabs(ctx,CSFP,2)<<"public "<<id->chars<<" BuildPartial() {return new "<<id->chars<<"(super.BuildPartial());}\n";
+        sendTabs(ctx,CSFP,2)<<"public "<<id->chars<<" Build() {if (_HasAllPBJFields) return new "<<id->chars<<"(super.Build());return null;}\n";
+/*
+        sendTabs(ctx,CSFP,1)<<"public void DiscardUnknownFields() {\n";
+        sendTabs(ctx,CSFP,2)<<"super.DiscardUnknownFields();\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+*/
+        
+        sendTabs(ctx,CSFP,2)<<"public pbd::MessageDescriptor DescriptorForType {\n";
+        sendTabs(ctx,CSFP,3)<<"get { return "<<id->chars<<".Descriptor; }";
+        sendTabs(ctx,CSFP,2)<<"}\n";
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csBuild->str();
+        
         sendTabs(ctx,CSFP,1)<<"}\n";
         sendTabs(ctx,CSFP,0)<<"}\n";
     }
