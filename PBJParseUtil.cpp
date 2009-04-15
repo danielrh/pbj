@@ -498,6 +498,8 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
         return "pb::ByteString";
     if (strcmp((char*)type->chars,"uuid")==0)
         return "PBJ.UUID";
+    if (strcmp((char*)type->chars,"sha256")==0)
+        return "PBJ.SHA256";
     if (strcmp((char*)type->chars,"time")==0)
         return "PBJ.Time";
     if (strcmp((char*)type->chars,"duration")==0)
@@ -595,6 +597,8 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
         return "::std::string";
     if (strcmp((char*)type->chars,"uuid")==0)
         return "PBJ::UUID";
+    if (strcmp((char*)type->chars,"sha256")==0)
+        return "PBJ::SHA256";
     if (strcmp((char*)type->chars,"time")==0)
         return "PBJ::Time";
     if (strcmp((char*)type->chars,"duration")==0)

@@ -4,6 +4,8 @@
 #include "util/BoundingBox.hpp"
 #include "util/Vector2.hpp"
 #include "util/Time.hpp"
+#include "util/Sha256.hpp"
+
 #include <google/protobuf/message.h>
 namespace PBJ {
 
@@ -236,6 +238,7 @@ public:
     
 };
 
+typedef Sirikata::SHA256 SHA256;
 typedef Sirikata::UUID UUID;
 typedef Sirikata::uint64 uint64;
 typedef Sirikata::uint32 uint32;
@@ -316,6 +319,12 @@ template <> class _PBJConstruct<PBJ::UUID> {
 public:
     std::string operator()(const PBJ::UUID&ct) {
         return ct.rawHexData();
+    }
+};
+template <> class _PBJConstruct<PBJ::SHA256> {
+public:
+    std::string operator()(const PBJ::SHA256&ct) {
+        return std::string((const char*)ct.rawData().begin(),(size_t)PBJ::SHA256::static_size);
     }
 };
 template <> class _PBJConstruct<PBJ::utf8string> {
@@ -503,6 +512,15 @@ public:
     }
     PBJ::UUID operator()() {
         return PBJ::UUID::null();
+    }
+};
+template <> class _PBJCast<PBJ::SHA256> {
+public:
+    PBJ::SHA256 operator()(const std::string bytes) {
+        return PBJ::SHA256::convertFromBinary(bytes.data());
+    }
+    PBJ::SHA256 operator()() {
+        return PBJ::SHA256::null();
     }
 };
 template <> class _PBJCast<PBJ::angle> {

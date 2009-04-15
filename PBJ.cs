@@ -1179,6 +1179,131 @@ public struct UUID {
 
 }
 
+
+public struct SHA256 {
+    ulong mLowOrderBytes;
+    ulong mLowMediumOrderBytes;
+    ulong mMediumHighOrderBytes;
+    ulong mHighOrderBytes;
+
+    
+    static ulong SetLMH(Google.ProtocolBuffers.ByteString data, int offset) {
+        ulong LowOrderBytes=0;
+        int shiftVal=0;
+        for (int i=0;i<8;++i) {
+            ulong temp=data[i];
+            LowOrderBytes|=(temp<<shiftVal);
+            shiftVal+=8;
+        }
+        return LowOrderBytes;
+    }
+    static ulong SetLow(Google.ProtocolBuffers.ByteString data) {
+        return SetLMH(data,0);
+    }
+    static ulong SetLowMedium (Google.ProtocolBuffers.ByteString data) {
+        return SetLMH(data,8);
+    }
+    static ulong SetMediumHigh (Google.ProtocolBuffers.ByteString data) {
+        return SetLMH(data,16);
+    }
+    static ulong SetHigh (Google.ProtocolBuffers.ByteString data) {
+        return SetLMH(data,24);
+    }
+    static ulong SetLMH(byte[] data, int offset) {
+        ulong LowOrderBytes=0;
+        int shiftVal=0;
+        for (int i=0;i<8;++i) {
+            ulong temp=data[i];
+            LowOrderBytes|=(temp<<shiftVal);
+            shiftVal+=8;
+        }
+        return LowOrderBytes;
+    }
+    static ulong SetLow (byte[] data) {
+        return SetLMH(data,0);
+    }
+    static ulong SetLowMedium (byte[] data) {
+        return SetLMH(data,8);
+    }
+    static ulong SetMediumHigh (byte[] data) {
+        return SetLMH(data,16);
+    }
+    static ulong SetHigh (byte[] data) {
+        return SetLMH(data,24);
+    }
+    public bool SetSHA256(byte[] data) {
+        if (data.Length==32) {
+            mLowOrderBytes=SetLow(data);
+            mLowMediumOrderBytes=SetLowMedium(data);
+            mMediumHighOrderBytes=SetMediumHigh(data);
+            mHighOrderBytes=SetHigh(data);
+            return true;
+        }else {
+            return false;
+        }
+    }
+    public byte[] GetBinaryData() {
+        byte[] data= new byte[32];
+        int shiftVal=0;
+        for (int i=0;i<8;++i) {
+            ulong temp=0xff;
+            temp=(mLowOrderBytes&(temp<<shiftVal));
+            temp=(temp>>shiftVal);
+            data[i]=(byte)temp;
+            shiftVal+=8;
+        }
+        shiftVal=0;
+        for (int i=8;i<16;++i) {
+            ulong temp=0xff;
+            temp=(mLowMediumOrderBytes&(temp<<shiftVal));
+            temp=(temp>>shiftVal);
+            data[i]=(byte)temp;
+            shiftVal+=8;
+        }
+        shiftVal=0;
+        for (int i=16;i<24;++i) {
+            ulong temp=0xff;
+            temp=(mMediumHighOrderBytes&(temp<<shiftVal));
+            temp=(temp>>shiftVal);
+            data[i]=(byte)temp;
+            shiftVal+=8;
+        } 
+        shiftVal=0;
+        for (int i=24;i<32;++i) {
+            ulong temp=0xff;
+            temp=(mHighOrderBytes&(temp<<shiftVal));
+            temp=(temp>>shiftVal);
+            data[i]=(byte)temp;
+            shiftVal+=8;
+        }
+        return data;
+    }
+
+    public static SHA256 Empty = new SHA256(new byte[32]);
+    public SHA256(byte []data) {
+        if (data.Length!=32) {
+            throw new System.ArgumentException("SHA256s must be provided 32 bytes");
+        }
+        mLowOrderBytes=SetLow(data);
+        mLowMediumOrderBytes=SetLowMedium(data);
+        mMediumHighOrderBytes=SetMediumHigh(data);
+        mHighOrderBytes=SetHigh(data);
+    }
+    public SHA256(Google.ProtocolBuffers.ByteString data) {
+        if (data.Length!=32) {
+            throw new System.ArgumentException("SHA256s must be provided 32 bytes");
+        }
+        mLowOrderBytes=SetLow(data);
+        mLowMediumOrderBytes=SetLowMedium(data);
+        mMediumHighOrderBytes=SetMediumHigh(data);
+        mHighOrderBytes=SetHigh(data);
+    }
+
+}
+
+
+
+
 public struct Time {
     ulong usec;
     public Time(ulong usec_since_epoch){
@@ -1238,6 +1363,9 @@ public static bool ValidateBytes<B>(B input) {
 }
 public static bool ValidateUuid(Google.ProtocolBuffers.ByteString input) {
     return input.Length==16;
+}
+public static bool ValidateSha256(Google.ProtocolBuffers.ByteString input) {
+    return input.Length==32;
 }
 public static bool ValidateAngle(float input) {
     return input>=0&&input<=3.1415926536*2.0;
@@ -1441,6 +1569,12 @@ public static Google.ProtocolBuffers.ByteString CastBytes() {
 public static UUID CastUuid(Google.ProtocolBuffers.ByteString input) {
     return new UUID(input);
 }
+public static SHA256 CastSha256(Google.ProtocolBuffers.ByteString input) {
+    return new SHA256(input);
+}
+public static SHA256 CastSha256() {
+    return SHA256.Empty;
+}
 public static UUID CastUuid() {
     return UUID.Empty;
 }
@@ -1476,6 +1610,11 @@ public static Duration CastDuration() {
     }
     public static Google.ProtocolBuffers.ByteString Construct(UUID u) {
         byte[] data=u.GetUUID();
+        Google.ProtocolBuffers.ByteString retval=Google.ProtocolBuffers.ByteString.CopyFrom(data,0,16);
+        return retval;
+    }
+    public static Google.ProtocolBuffers.ByteString Construct(SHA256 u) {
+        byte[] data=u.GetBinaryData();
         Google.ProtocolBuffers.ByteString retval=Google.ProtocolBuffers.ByteString.CopyFrom(data,0,16);
         return retval;
     }
