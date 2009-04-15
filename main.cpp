@@ -4,10 +4,12 @@ extern "C" {
 }
 #include <sstream>
 #include <iostream>
+#include <fstream>
 #include "PBJLanguageOutput.hpp"
 
 int main(int argc, char *argv[])
 {
+    
     pANTLR3_UINT8 filename;
     pANTLR3_INPUT_STREAM input;
     pPBJLexer lxr;
@@ -21,6 +23,22 @@ int main(int argc, char *argv[])
     const char * outputFilename="output";
     if (argc>=3) {
         outputFilename=argv[2];
+    }
+    char * csOut=NULL;
+    char * cppOut=NULL;
+    char * cppInclude=NULL;
+    int argindex;
+    for (argindex=3;argindex<argc;++argindex) {
+        
+        if (strncmp(argv[argindex],"--cpp=",6)==0) {
+            cppOut=argv[argindex]+6;
+        }
+        if (strncmp(argv[argindex],"--cs=",5)==0) {
+            csOut=argv[argindex]+5;
+        }
+        if (strncmp(argv[argindex],"--include=",10)==0) {
+            cppInclude=argv[argindex]+10;
+        }
     }
     
     input = antlr3AsciiFileStreamNew(filename);
@@ -50,9 +68,21 @@ int main(int argc, char *argv[])
     SCOPE_TOP(NameSpace)->filename=tstream->tstream->tokenSource->strFactory->newRaw(tstream->tstream->tokenSource->strFactory);
     SCOPE_TOP(NameSpace)->filename->append8(SCOPE_TOP(NameSpace)->filename,(const char*)outputFilename);
     SCOPE_TOP(NameSpace)->output=(struct LanguageOutputStruct*)malloc(sizeof(struct LanguageOutputStruct));
+    std::fstream cppOutStream,csOutStream;
     SCOPE_TOP(NameSpace)->output->cs=&std::cerr;
     SCOPE_TOP(NameSpace)->output->cpp=&std::cout;//could open something dependent on filename
-
+    if (cppOut) {
+        cppOutStream.open(cppOut,std::ios_base::out);
+        SCOPE_TOP(NameSpace)->output->cpp=&cppOutStream;
+    }
+            
+    if (csOut) {
+        csOutStream.open(csOut,std::ios_base::out);
+        SCOPE_TOP(NameSpace)->output->cs=&csOutStream;
+    }
+    if (cppInclude) {
+        (*SCOPE_TOP(NameSpace)->output->cpp)<<"#include \""<<cppInclude<<"\"\n";
+    }
     pbjAST=psr->protocol(psr);
     if (psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec) > 0)
     {
