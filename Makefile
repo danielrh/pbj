@@ -8,10 +8,10 @@ Output.cs:output.proto
 	${SIRIKATA}/dependencies/bin/protoc --csharp_out=. output.proto
 output.pb.h: output.pbj.hpp
 	${SIRIKATA}/dependencies/bin/protoc --cpp_out=. output.proto
-output.pbj.cs: pbj output.proto protocol/Test.proto
-	./pbj protocol/Test.proto output.proto 1> output.pbj.hpp 2> Output.pbj.cs
-output.pbj.hpp: pbj output.proto protocol/Test.proto
-	./pbj protocol/Test.proto output.proto 1> output.pbj.hpp 2> Output.pbj.cs
+output.pbj.cs: pbj output.proto protocol/Test.pbj
+	./pbj protocol/Test.pbj output.proto 1> output.pbj.hpp 2> Output.pbj.cs
+output.pbj.hpp: pbj output.proto protocol/Test.pbj
+	./pbj protocol/Test.pbj output.proto 1> output.pbj.hpp 2> Output.pbj.cs
 pbj : main.cpp PBJ.h PBJLexer.o PBJParser.o PBJParseUtil.o
 	g++ -std=c++98 -static -g2 -o pbj -Iantlr-3.1.2/include -Lantlr-3.1.2/lib -I/usr/local/include -L/usr/local/lib main.cpp PBJLexer.o PBJParser.o PBJParseUtil.o -lantlr3c || g++ -o pbj -Iantlr-3.1.2/include -Lantlr-3.1.2/lib -I/usr/local/include -L/usr/local/lib -g2 main.cpp PBJLexer.o PBJParser.o PBJParseUtil.o antlr-3.1.2/lib/libantlr3c.a || g++ -o pbj -Iantlr-3.1.2/include -Lantlr-3.1.2/lib -I/usr/local/include -L/usr/local/lib -g2 main.cpp PBJLexer.o PBJParser.o PBJParseUtil.o -lantlr3c
 
@@ -19,6 +19,12 @@ PBJLexer.c : PBJ.g
 	java -jar antlr-3.1.3.jar PBJ.g
 
 PBJParser.c : PBJ.g
+	java -jar antlr-3.1.3.jar PBJ.g
+
+PBJLexer.h : PBJ.g
+	java -jar antlr-3.1.3.jar PBJ.g
+
+PBJParser.h : PBJ.g
 	java -jar antlr-3.1.3.jar PBJ.g
 
 PBJLexer.o : PBJLexer.h PBJLexer.c

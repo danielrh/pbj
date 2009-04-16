@@ -359,41 +359,28 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,2)<<"template <class Message> bool computeHasFields(const Message* thus) const;\n";
         sendTabs(ctx,1)<<"};\n";
 */
-        sendTabs(ctx,1)<<"class "<<id->chars<<" : public PBJ::Message< "<<id->chars<<" > {\n";
-        sendTabs(ctx,1)<<"protected:\n";
-        sendTabs(ctx,2)<<"_PBJ_Internal";
-        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" superconstructed;\n";
 
+        sendTabs(ctx,1)<<"class I"<<id->chars<<" : public PBJ::Message< I"<<id->chars<<" > {\n";
+        sendTabs(ctx,1)<<"protected:\n";
         sendTabs(ctx,2)<<"_PBJ_Internal";
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" *super;\n";
         sendTabs(ctx,1)<<"public:\n";
         sendTabs(ctx,2)<<"_PBJ_Internal";
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"* _PBJSuper(){ return super; }\n";
+        sendTabs(ctx,2)<<"const _PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"* _PBJSuper()const{ return super; }\n";
 
-        sendTabs(ctx,2)<<id->chars<<"():PBJ::Message< "<<id->chars<<"> (&superconstructed) {\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,2)<<"}\n";
-        sendTabs(ctx,2)<<id->chars<<"(_PBJ_Internal";
-        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &reference):PBJ::Message< "<<id->chars<<" >(&reference) {\n";
+        sendTabs(ctx,2)<<"I"<<id->chars<<"(_PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &reference):PBJ::Message< I"<<id->chars<<" >(&reference) {\n";
         sendTabs(ctx,3)<<"super=&reference;\n";
         sendTabs(ctx,2)<<"}\n";
 
-        sendTabs(ctx,2)<<id->chars<<"(const _PBJ_Internal";
-        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &copy):PBJ::Message< "<<id->chars<<" >(&superconstructed), superconstructed(copy) {\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,2)<<"}\n";
 
-        sendTabs(ctx,2)<<id->chars<<"& operator=(const "<<id->chars<<" &copy) {\n";
-        sendTabs(ctx,3)<<"setMessageRepresentation(&superconstructed);\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,3)<<"*super=*copy.super;\n";
-        sendTabs(ctx,3)<<"return *this;\n";
-        sendTabs(ctx,2)<<"}\n";
-
-
-        sendTabs(ctx,2)<<"inline static "<<id->chars<<" default_instance() {\n";
-        sendTabs(ctx,3)<<id->chars<<" _internalStaticVar(_PBJ_Internal";
-        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"::default_instance());\n";
+        sendTabs(ctx,2)<<"inline static const I"<<id->chars<<"& default_instance() {\n";
+        sendTabs(ctx,3)<<"static _PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" def_inst=_PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"::default_instance();\n";
+        sendTabs(ctx,3)<<"static I"<<id->chars<<" _internalStaticVar(def_inst);\n";
         sendTabs(ctx,3)<<"return _internalStaticVar;\n";        
         sendTabs(ctx,2)<<"}\n";
 
@@ -419,7 +406,6 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,3)<<"return super->GetReflection();\n";
         sendTabs(ctx,2)<<"}\n";
         sendTabs(ctx,2)<<"int GetCachedSize()const{ return super->GetCachedSize(); }\n";
-        sendTabs(ctx,2)<<id->chars<<"* New()const{ return new "<<id->chars<<"; }\n";
     }
     if (CSFP) {
         sendTabs(ctx,CSFP,1)<<"public class "<<id->chars<<" : PBJ.IMessage {\n";
@@ -966,13 +952,14 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) {return PBJ._PBJ.Validate"<<utype->chars<<"(super.Get"<<uname->chars<<"(index));}\n";
                 }
                 sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"(int index) {\n";
-                sendTabs(ctx,1)<<"inline "<<(isRawByteArray?"const std::string&":cppType)<<" "<<name->chars<<"(int index) const {\n";
+                sendTabs(ctx,1)<<"inline "<<(isMessageType?"I":"")<<(isRawByteArray?"const std::string&":cppType)<<" "<<name->chars<<"(int index) const {\n";
                 if (value) {
                     sendTabs(ctx,2)<<"if (has_"<<name->chars<<"(index)) {\n";
                     sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<"(index)) {\n";
                 }
                 if (isMessageType) {
-                    sendTabs(ctx,value?3:2)<<"return "<<cppType<<"(super->"<<name->chars<<"(index));\n";//FIXME:cast
+                    sendTabs(ctx,value?3:2)<<"return I"<<cppType<<"(*const_cast<_PBJ_Internal";
+                    sendCppNs(ctx,CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"(index)));\n";
                     sendTabs(ctx,csShared,value?3:2)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super.Get"<<uname->chars<<"(index));\n";//FIXME:cast
                 } else if (isFlag) {
                     sendTabs(ctx,value?3:2)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(index),";
@@ -995,7 +982,11 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                         sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
                         sendTabs(ctx,csShared,3)<<"return "/*<<"new "<<csType<<"("*/<<value->chars/*<<")"*/<<";\n";
                     }else {
-                        sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast"<<(isMessageType?"Message":"")<<"< "<<pbjType<<">()();\n";
+                        if (isMessageType) {
+                            sendTabs(ctx,value?3:2)<<"return _PBJCastMessage <"<<cppType<<",I"<<cppType<<">()();\n";
+                        }else {
+                            sendTabs(ctx,value?3:2)<<"return ("<<cppType<<")_PBJCast< "<<pbjType<<">()();\n";
+                        }
                         sendTabs(ctx,csShared,value?3:2)<<"return "<<(isMessageType?(isSubMessage?"new Types.":"new "):"PBJ._PBJ.Cast")<<utype->chars<<"();\n";
                     }
                     sendTabs(ctx,2)<<"}\n";
@@ -1010,7 +1001,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
                 
-                sendTabs(ctx,1)<<"inline "<<cppType<<" set_"<<name->chars<<"(int index) {\n";
+                sendTabs(ctx,1)<<"inline I"<<cppType<<" mutable_"<<name->chars<<"(int index) {\n";
                 sendTabs(ctx,2)<<"return *super->mutable_"<<name->chars<<"(index);\n";
                 sendTabs(ctx,1)<<"}\n";
             }else {
@@ -1076,7 +1067,8 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"{ get {\n";
                 sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<") {\n";
                 if (isMessageType) {
-                    sendTabs(ctx,3)<<"return "<<type->chars<<"(super->"<<name->chars<<"());\n";
+                    sendTabs(ctx,3)<<"return I"<<type->chars<<"(*const_cast<_PBJ_Internal";
+                    sendCppNs(ctx,CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"()));\n";
                     sendTabs(ctx,csShared,3)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super."<<uname->chars<<");\n";
                 } else if (isEnum) {
                     sendTabs(ctx,csShared,3)<<"return (Types."<<type->chars<<")super."<<uname->chars<<";\n";
@@ -1096,7 +1088,11 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,3)<<"return "<<cppType<<"("<<value->chars<<");\n";
                     sendTabs(ctx,csShared,3)<<"return "/*<<"new "<<csType<<"("*/<<value->chars/*<<")"*/<<";\n";
                 }else {
-                    sendTabs(ctx,3)<<"return _PBJCast"<<(isMessageType?"Message":"")<<" < "<<pbjType<<"> ()();\n";
+                    if (isMessageType) {
+                        sendTabs(ctx,3)<<"return _PBJCastMessage< "<<cppType<<",I"<<cppType<<"> ()();\n";
+                    }else {
+                        sendTabs(ctx,3)<<"return _PBJCast < "<<pbjType<<"> ()();\n";                        
+                    }
                     if (isEnum||isFlag) {
                         if (isEnum) {
                             sendTabs(ctx,csShared,3)<<"return new Types."<<type->chars<<"();\n";
@@ -1133,7 +1129,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,CSBUILD,2)<<"super."<<uname->chars<<"=value._PBJSuper;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
             }
-            sendTabs(ctx,1)<<"inline "<<cppType<<" "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
+            sendTabs(ctx,1)<<"inline I"<<cppType<<" "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
             sendTabs(ctx,2)<<"return *super->"<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"();\n";
             sendTabs(ctx,1)<<"}\n";
         }else {
@@ -1258,6 +1254,52 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,1)<<"}\n";
         
         sendTabs(ctx,0)<<"};\n";
+        sendTabs(ctx,1)<<"class "<<id->chars<<" : public I"<<id->chars<<" {\n";
+        sendTabs(ctx,1)<<"protected:\n";
+        sendTabs(ctx,2)<<"_PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<" superconstructed;\n";        
+        sendTabs(ctx,1)<<"public:\n";
+        sendTabs(ctx,2)<<id->chars<<"():I"<<id->chars<<"(superconstructed) {\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<id->chars<<"(const _PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<" &copy):I"<<id->chars<<"(superconstructed), superconstructed(copy) {\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<id->chars<<"(_PBJ_Internal";
+        sendCppNs(ctx,CPPFP)<<" &reference):I"<<id->chars<<"(reference) {\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<id->chars<<"(const I"<<id->chars<<" &copy):I"<<id->chars<<"(superconstructed) {\n";
+//        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<id->chars<<"(const "<<id->chars<<" &copy):I"<<id->chars<<"(superconstructed) {\n";
+//        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<id->chars<<"& operator=(const I"<<id->chars<<" &copy) {\n";
+        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,3)<<"return *this;\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<id->chars<<"& operator=(const "<<id->chars<<" &copy) {\n";
+        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
+        sendTabs(ctx,3)<<"super=&superconstructed;\n";
+        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,3)<<"return *this;\n";
+        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<id->chars<<"* New()const{ return new "<<id->chars<<"; }\n";
+
+
+        sendTabs(ctx,1)<<"};\n";
+
     }
     if (CSFP) {
         int i;
