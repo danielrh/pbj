@@ -449,13 +449,14 @@ public:
 };
 
 
-template <typename convertTo> class _PBJCastMessage {
+template <typename convertFrom, typename convertTo> class _PBJCastMessage {
 public:
     template <typename Type> const Type& operator()(const Type&ct) {
         return ct;
     }
-    convertTo operator()() {
-        return convertTo();
+    const convertTo& operator()() {
+        static convertFrom retval;
+        return retval;;
     }
 };
 template <typename convertTo> class _PBJCast {
