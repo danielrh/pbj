@@ -6,6 +6,7 @@ int main (int argc, char**argv) {
     tm.set_v3f(PBJ::Vector3f(1,2,3));
     tm.add_submessers().set_subvector(PBJ::Vector3d(2,3,4));
     tm.mutable_submes().set_subvector(PBJ::Vector3d(5,6,7));
+    tm.mutable_extmesser().mutable_submes().set_subvector(PBJ::Vector3d(8,9,10));
     std::string s;
     bool retval=tm.SerializeToString(&s);
     assert(retval);
@@ -23,6 +24,9 @@ int main (int argc, char**argv) {
     assert(ti.submes().subvector().x==5);
     assert(ti.submes().subvector().y==6);
     assert(ti.submes().subvector().z==7);
+    assert(ti.extmesser().submes().subvector().x==8);
+    assert(ti.extmesser().submes().subvector().y==9);
+    assert(ti.extmesser().submes().subvector().z==10);
     return 0;
 }
 

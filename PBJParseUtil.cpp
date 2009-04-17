@@ -558,7 +558,13 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
         return "PBJ.BoundingBox3f3f";
     if (strcmp((char*)type->chars,"boundingbox3d3f")==0)
         return "PBJ.BoundingBox3d3f";
-    emptyStr->append8(emptyStr,"Types.");
+    int isEnum = SCOPE_TOP(Symbols)->enum_sizes->get(SCOPE_TOP(Symbols)->enum_sizes,type->chars)!=NULL;
+    int isFlag = SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)!=NULL;
+
+    int isSubMessage=((SCOPE_TOP(Symbols)->types->get(SCOPE_TOP(Symbols)->types,type->chars)!=NULL)&&!isEnum)&&!isFlag;    
+    if (isSubMessage||isEnum||isFlag) {
+        emptyStr->append8(emptyStr,"Types.");
+    }
     emptyStr->appendS(emptyStr,type);
     
     return (char*)emptyStr->chars;
@@ -577,6 +583,11 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
         }
         return "PBJ::uint8";
     }
+    if (strcmp((char*)type->chars,"double")==0)
+        return "double";
+    if (strcmp((char*)type->chars,"float")==0)
+        return "float";
+
     if (strcmp((char*)type->chars,"string")==0)
         return "::std::string";
     if (strcmp((char*)type->chars,"bytes")==0)
@@ -799,7 +810,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
     const char * pbjType=getPBJType(ctx,type);
     int isEnum = SCOPE_TOP(Symbols)->enum_sizes->get(SCOPE_TOP(Symbols)->enum_sizes,type->chars)!=NULL;
     int isFlag = SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)!=NULL;
-    int isMessageType=(isSymbol(ctx,type)&&!isEnum)&&!isFlag;
+    int isMessageType=((getCppType(ctx,type)==(char*)type->chars||isSymbol(ctx,type))&&!isEnum)&&!isFlag;
     int isSubMessage=((SCOPE_TOP(Symbols)->types->get(SCOPE_TOP(Symbols)->types,type->chars)!=NULL)&&!isEnum)&&!isFlag;
     int isRepeated=!notRepeated;
     std::stringstream csShared;
@@ -959,7 +970,8 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 }
                 if (isMessageType) {
                     sendTabs(ctx,value?3:2)<<"return I"<<cppType<<"(*const_cast<_PBJ_Internal";
-                    sendCppNs(ctx,CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"(index)));\n";
+
+                    (isSubMessage?sendCppNs(ctx,CPPFP):CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"(index)));\n";
                     sendTabs(ctx,csShared,value?3:2)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super.Get"<<uname->chars<<"(index));\n";//FIXME:cast
                 } else if (isFlag) {
                     sendTabs(ctx,value?3:2)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(index),";
@@ -1068,7 +1080,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<") {\n";
                 if (isMessageType) {
                     sendTabs(ctx,3)<<"return I"<<type->chars<<"(*const_cast<_PBJ_Internal";
-                    sendCppNs(ctx,CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"()));\n";
+                    (isSubMessage?sendCppNs(ctx,CPPFP):CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"()));\n";
                     sendTabs(ctx,csShared,3)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super."<<uname->chars<<");\n";
                 } else if (isEnum) {
                     sendTabs(ctx,csShared,3)<<"return (Types."<<type->chars<<")super."<<uname->chars<<";\n";
