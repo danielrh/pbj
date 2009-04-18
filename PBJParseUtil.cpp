@@ -464,6 +464,9 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
     if (strcmp((char*)type->chars,"float")==0)
         return "float";
 
+    if (strcmp((char*)type->chars,"bool")==0)
+        return "bool";
+
     if (strcmp((char*)type->chars,"string")==0)
         return "string";
     if (strcmp((char*)type->chars,"bytes")==0)
@@ -573,6 +576,8 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
         return "double";
     if (strcmp((char*)type->chars,"float")==0)
         return "float";
+    if (strcmp((char*)type->chars,"bool")==0)
+        return "bool";
 
     if (strcmp((char*)type->chars,"string")==0)
         return "::std::string";
@@ -760,19 +765,33 @@ pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
     return uname;
 }
 pANTLR3_STRING toVarUpper(pANTLR3_STRING name) {
-    pANTLR3_STRING uname=stringDup(name);
+    char* uname=strndup((char*)name->chars,name->len);
     bool reset=false;
-    uname->chars[0]=toupper(name->chars[0]);
-    for (unsigned int i=1;i<uname->len;++i) {
-        if (reset) {
-            uname->chars[i]=toupper(name->chars[i]);            
-            reset=false;
+    uname[0]=toupper(name->chars[0]);
+    if (name->len) {
+        unsigned int writer=1;
+        for (unsigned int i=1;i<name->len;++i) {
+            if (reset) {
+                uname[writer]=toupper(name->chars[i]);            
+                reset=false;
+            }else {
+                uname[writer]=name->chars[i];            
+            }
+            if (name->chars[i]>='0'&&name->chars[i]<='9'){
+                reset=true;
+            }
+            if (name->chars[i]=='_') {
+                reset=true;
+            }else {
+                ++writer;
+            }
         }
-        if (uname->chars[i]>='0'&&uname->chars[i]<='9'){
-            reset=true;
-        }
+        uname[writer]='\0';
     }
-    return uname;
+    pANTLR3_STRING retval=name->factory->newRaw(name->factory);
+    retval->append8(retval,uname);
+    free(uname);
+    return retval;
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isRequired, int isMultiplicitiveAdvancedType){
     if (isMultiplicitiveAdvancedType&&isRequired) {

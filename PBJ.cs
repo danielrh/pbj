@@ -1325,6 +1325,9 @@ public class Duration {
 
 class _PBJ {
 
+public static bool ValidateBool(bool d) {
+    return true;
+}
 public static bool ValidateDouble(double d) {
     return true;
 }
@@ -1383,6 +1386,9 @@ public static bool ValidateAngle(float input) {
 
 
 
+public static bool CastBool(bool d) {
+    return d;
+}
 public static double CastDouble(double d) {
     return d;
 }
