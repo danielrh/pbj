@@ -205,7 +205,7 @@ void grammarToString	(pANTLR3_TREE_NODE_STREAM tns, pANTLR3_BASE_TREE p, pANTLR3
 	}
 }
 static char* stringChar(pANTLR3_STRING str, ANTLR3_UINT8 searchme) {
-    int i;
+    unsigned int i;
     for (i=0;i<str->len;++i) {
         if (str->chars[i]==searchme) {
             return (char*)&str->chars[i];
@@ -295,7 +295,7 @@ static std::ostream& sendTabs(pPBJParser ctx,std::ostream &os,int offset) {
 }
 static bool isSubMessage(pPBJParser ctx, int loop_add=0) {
     int i;
-    for (i=0;i+1-loop_add<SCOPE_SIZE(Symbols);++i) {
+    for (i=0;i+1-loop_add<(int)SCOPE_SIZE(Symbols);++i) {
         if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
             return true;
         }
@@ -305,7 +305,7 @@ static bool isSubMessage(pPBJParser ctx, int loop_add=0) {
 
 
 static bool isSymbol(pPBJParser ctx, pANTLR3_STRING type) {
-    int i;
+    unsigned int i;
     for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
         pANTLR3_HASH_TABLE hash=((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->types;
         if (hash->get(hash,type)!=NULL) {
@@ -316,7 +316,7 @@ static bool isSymbol(pPBJParser ctx, pANTLR3_STRING type) {
 }
 
 static std::ostream& sendCppNs(pPBJParser ctx, std::ostream&fp,const char*delim="::", int loop_add=0) {
-    int i;
+    unsigned int i;
     for (i=0;i+1-loop_add<SCOPE_SIZE(Symbols);++i) {
         if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
             fp<<delim<<((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message->chars;
@@ -324,21 +324,7 @@ static std::ostream& sendCppNs(pPBJParser ctx, std::ostream&fp,const char*delim=
     }
     return fp;
 }
-static std::ostream& sendHashNs(pPBJParser ctx, std::ostream&fp) {
-    int i;
-    unsigned int delim=0;
-    for (i=0;i+1<SCOPE_SIZE(Symbols);++i) {
-        if (((SCOPE_TYPE(Symbols))(SCOPE_INSTANCE(Symbols,i)))->message) {
-            pANTLR3_STRING msg=((SCOPE_TYPE(Symbols))SCOPE_INSTANCE(Symbols,i))->message;
-            int i;
-            for (i=0;i<msg->len;++i){ 
-                delim=delim^(msg->chars[i]+i*63);
-            }
-            fp<<msg->chars<<delim;
-        }
-    }
-    return fp;
-}
+
 static std::ostream& sendCsNs(pPBJParser ctx,  std::ostream&fp,const char*delim=".", int loop_add=0) {
     return sendCppNs(ctx,fp,delim,loop_add);
 }
@@ -461,7 +447,7 @@ int getNumItemsPerElement(pPBJParser ctx, pANTLR3_STRING type) {
 }
 const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyStr) {
     int *flagBits=NULL;
-    if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
+    if ((flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars))!=NULL) {
         if (*flagBits>32) {
             return "ulong";
         }
@@ -477,6 +463,9 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
         return "double";
     if (strcmp((char*)type->chars,"float")==0)
         return "float";
+
+    if (strcmp((char*)type->chars,"bool")==0)
+        return "bool";
 
     if (strcmp((char*)type->chars,"string")==0)
         return "string";
@@ -571,7 +560,7 @@ const char *getCsType(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING emptyS
 }
 const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
     int *flagBits=NULL;
-    if (flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars)) {
+    if ((flagBits=(int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,type->chars))!=NULL) {
         if (*flagBits>32) {
             return "PBJ::uint64";
         }
@@ -587,6 +576,8 @@ const char *getCppType(pPBJParser ctx, pANTLR3_STRING type) {
         return "double";
     if (strcmp((char*)type->chars,"float")==0)
         return "float";
+    if (strcmp((char*)type->chars,"bool")==0)
+        return "bool";
 
     if (strcmp((char*)type->chars,"string")==0)
         return "::std::string";
@@ -770,24 +761,37 @@ std::ostream& printCsFlags(std::ostream&fp, pANTLR3_HASH_TABLE flag_all_on,pANTL
 }
 pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
     pANTLR3_STRING uname=stringDup(name);
-    bool reset=false;
     uname->chars[0]=toupper(name->chars[0]);
     return uname;
 }
 pANTLR3_STRING toVarUpper(pANTLR3_STRING name) {
-    pANTLR3_STRING uname=stringDup(name);
+    char* uname=strndup((char*)name->chars,name->len);
     bool reset=false;
-    uname->chars[0]=toupper(name->chars[0]);
-    for (int i=1;i<uname->len;++i) {
-        if (reset) {
-            uname->chars[i]=toupper(name->chars[i]);            
-            reset=false;
+    uname[0]=toupper(name->chars[0]);
+    if (name->len) {
+        unsigned int writer=1;
+        for (unsigned int i=1;i<name->len;++i) {
+            if (reset) {
+                uname[writer]=toupper(name->chars[i]);            
+                reset=false;
+            }else {
+                uname[writer]=name->chars[i];            
+            }
+            if (name->chars[i]>='0'&&name->chars[i]<='9'){
+                reset=true;
+            }
+            if (name->chars[i]=='_') {
+                reset=true;
+            }else {
+                ++writer;
+            }
         }
-        if (uname->chars[i]>='0'&&uname->chars[i]<='9'){
-            reset=true;
-        }
+        uname[writer]='\0';
     }
-    return uname;
+    pANTLR3_STRING retval=name->factory->newRaw(name->factory);
+    retval->append8(retval,uname);
+    free(uname);
+    return retval;
 }
 void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isRequired, int isMultiplicitiveAdvancedType){
     if (isMultiplicitiveAdvancedType&&isRequired) {
@@ -943,7 +947,6 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {assert(index>=0&&index<"<<name->chars<<"_size()); return true;}\n";
                     sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) {return true;}\n";
                 }else if (isFlag) {
-                    int i,numFlags=0;
                     sendTabs(ctx,1)<<"inline bool has_"<<name->chars<<"(int index) const {";
                     sendTabs(ctx,2)<<"assert(index>=0&&index<"<<name->chars<<"_size();\n";
                     sendTabs(ctx,2)<<"return _PBJValidateFlags< "<<pbjType<<">()(super->"<<name->chars<<"(index),";
@@ -1314,7 +1317,6 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
 
     }
     if (CSFP) {
-        int i;
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csType->str();
         sendTabs(ctx,CSFP,1)<<"}\n";//types
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csMembers->str();
