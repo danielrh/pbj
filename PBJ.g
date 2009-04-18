@@ -246,10 +246,10 @@ field_type
               FIXED32["uint32"] 
         -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
             && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)<=32}?
-              FIXED32["fixed32"] 
+              FIXED32["uint32"] 
         -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
             && *(unsigned int*)SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)==64}?
-             FIXED64["fixed64"] 
+             FIXED64["uint64"] 
         -> IDENTIFIER )
     {
        $field::fieldType=stringDup($IDENTIFIER.text);
