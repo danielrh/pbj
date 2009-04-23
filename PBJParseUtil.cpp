@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <sstream>
 #include <iostream>
+#include <string.h>
 #include "PBJLanguageOutput.hpp"
 void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->types->free(symtab->types);
@@ -37,7 +38,7 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
         memcpy(symtab->output,((SCOPE_TYPE(NameSpace) )SCOPE_INSTANCE(NameSpace,SCOPE_SIZE(NameSpace)-2))->output,sizeof(struct LanguageOutputStruct));
     }
     if (symtab->output->cpp||symtab->output->cs) {
-        char lst;
+        char lst='.';
         if (symtab->filename->len>6) {
             lst=symtab->filename->chars[symtab->filename->len-6];
             assert(lst=='.');
@@ -111,7 +112,7 @@ void defineImport(pPBJParser ctx, pANTLR3_STRING filename) {
     s->appendS(s,filename);
     SCOPE_TOP(NameSpace)->imports->add(SCOPE_TOP(NameSpace)->imports,s,&stringFree);
     if (CPPFP) {
-        char lst;
+        char lst='.';
         if (s->len>6) {
             lst=s->chars[s->len-6];
             assert(lst=='.');
@@ -765,7 +766,7 @@ pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
     return uname;
 }
 pANTLR3_STRING toVarUpper(pANTLR3_STRING name) {
-    char* uname=strndup((char*)name->chars,name->len);
+    char* uname=strdup((char*)name->chars);
     bool reset=false;
     uname[0]=toupper(name->chars[0]);
     if (name->len) {
