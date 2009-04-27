@@ -37,7 +37,7 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
         memcpy(symtab->output,((SCOPE_TYPE(NameSpace) )SCOPE_INSTANCE(NameSpace,SCOPE_SIZE(NameSpace)-2))->output,sizeof(struct LanguageOutputStruct));
     }
     if (symtab->output->cpp||symtab->output->cs) {
-        char lst;
+        char lst='.';
         if (symtab->filename->len>6) {
             lst=symtab->filename->chars[symtab->filename->len-6];
             assert(lst=='.');
@@ -111,7 +111,7 @@ void defineImport(pPBJParser ctx, pANTLR3_STRING filename) {
     s->appendS(s,filename);
     SCOPE_TOP(NameSpace)->imports->add(SCOPE_TOP(NameSpace)->imports,s,&stringFree);
     if (CPPFP) {
-        char lst;
+        char lst='.';
         if (s->len>6) {
             lst=s->chars[s->len-6];
             assert(lst=='.');
@@ -765,7 +765,7 @@ pANTLR3_STRING toFirstUpper(pANTLR3_STRING name) {
     return uname;
 }
 pANTLR3_STRING toVarUpper(pANTLR3_STRING name) {
-    char* uname=strndup((char*)name->chars,name->len);
+    char* uname=strdup((char*)name->chars);
     bool reset=false;
     uname[0]=toupper(name->chars[0]);
     if (name->len) {
@@ -922,6 +922,10 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,1)<<"public int "<<uname->chars<<"Count { get { return super."<<uname->chars<<"Count;} }\n";
                 bool isRawByteArray=(strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0);
                 if (isRawByteArray) {//strings and bytes have special setter functionality
+                    sendTabs(ctx,1)<<"inline std::string& "<<name->chars<<"(int index) {\n";
+                    sendTabs(ctx,2)<<"return *super->mutable_"<<name->chars<<"(index);\n";
+                    sendTabs(ctx,1)<<"}\n";
+
                     sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const char *value) const {\n";
                     sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(index,value);\n";
                     sendTabs(ctx,1)<<"}\n";
