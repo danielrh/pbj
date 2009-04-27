@@ -923,6 +923,10 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,1)<<"public int "<<uname->chars<<"Count { get { return super."<<uname->chars<<"Count;} }\n";
                 bool isRawByteArray=(strcmp((char*)type->chars,"bytes")==0||strcmp((char*)type->chars,"string")==0);
                 if (isRawByteArray) {//strings and bytes have special setter functionality
+                    sendTabs(ctx,1)<<"inline std::string& "<<name->chars<<"(int index) {\n";
+                    sendTabs(ctx,2)<<"return *super->mutable_"<<name->chars<<"(index);\n";
+                    sendTabs(ctx,1)<<"}\n";
+
                     sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const char *value) const {\n";
                     sendTabs(ctx,2)<<"super->set_"<<name->chars<<"(index,value);\n";
                     sendTabs(ctx,1)<<"}\n";
