@@ -30,8 +30,6 @@ protected:
         _mMessage=msg;
     }
 public:
-    virtual ~Message() {
-    }
 
     void CopyFrom(const Message&from) {
         _mMessage->CopyFrom(from._mMessage);
@@ -213,7 +211,7 @@ public:
   // Computes the serialized size of the message.  This recursively calls
   // ByteSize() on all embedded messages.  If a subclass does not override
   // this, it MUST override SetCachedSize().
-    virtual int ByteSize() const{
+    int ByteSize() const{
         return _mMessage->ByteSize();
     }
 
@@ -235,7 +233,7 @@ public:
   // sub-message is changed, all of its parents' cached sizes would need to be
   // invalidated, which is too much work for an otherwise inlined setter
   // method.)
-    virtual int GetCachedSize() const {
+    int GetCachedSize() const {
         return _mMessage->GetCachedSize();
     }
 
