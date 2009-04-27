@@ -210,7 +210,7 @@ public:
   // Computes the serialized size of the message.  This recursively calls
   // ByteSize() on all embedded messages.  If a subclass does not override
   // this, it MUST override SetCachedSize().
-    virtual int ByteSize() const{
+    int ByteSize() const{
         return _mMessage->ByteSize();
     }
 
@@ -232,7 +232,7 @@ public:
   // sub-message is changed, all of its parents' cached sizes would need to be
   // invalidated, which is too much work for an otherwise inlined setter
   // method.)
-    virtual int GetCachedSize() const {
+    int GetCachedSize() const {
         return _mMessage->GetCachedSize();
     }
     
@@ -243,7 +243,7 @@ typedef Sirikata::UUID UUID;
 typedef Sirikata::uint64 uint64;
 typedef Sirikata::uint32 uint32;
 typedef Sirikata::uint16 uint16;
-typedef Sirikata::int8 int8;
+typedef Sirikata::uint8 uint8;
 typedef Sirikata::int64 int64;
 typedef Sirikata::int32 int32;
 typedef Sirikata::int16 int16;
