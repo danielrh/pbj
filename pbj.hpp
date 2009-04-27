@@ -30,6 +30,9 @@ protected:
         _mMessage=msg;
     }
 public:
+    virtual ~Message() {
+    }
+
     void CopyFrom(const Message&from) {
         _mMessage->CopyFrom(from._mMessage);
     }
