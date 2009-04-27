@@ -235,7 +235,7 @@ public:
     virtual int GetCachedSize() const {
         return _mMessage->GetCachedSize();
     }
-    
+
 };
 
 typedef Sirikata::SHA256 SHA256;
@@ -243,7 +243,7 @@ typedef Sirikata::UUID UUID;
 typedef Sirikata::uint64 uint64;
 typedef Sirikata::uint32 uint32;
 typedef Sirikata::uint16 uint16;
-typedef Sirikata::int8 int8;
+typedef Sirikata::uint8 uint8;
 typedef Sirikata::int64 int64;
 typedef Sirikata::int32 int32;
 typedef Sirikata::int16 int16;
@@ -424,7 +424,7 @@ public:
     typedef PBJ::Array3f ArrayType;
     PBJ::Array3f operator()(const PBJ::Quaternion&q) {
         PBJ::Quaternion ct=q/q.length();
-        
+
         float data[3]={ct.x+(ct.w<0?3.0:0.0),ct.y,ct.z};
         return PBJ::Array3f::construct(data);
     }
@@ -500,7 +500,7 @@ public:
             x-=3;
         if (y>1.5)
             y-=3;
-        
+
         return PBJ::Vector3f(x,y,neg-neg*sqrt(x*x+y*y));
     }
 
@@ -556,7 +556,7 @@ public:
 template <> class _PBJCast<PBJ::Quaternion> {
 public:
     PBJ::Quaternion operator()(float x, float y,float z) {
-        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;        
+        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;
         if (x>1.5) x-=3;
         if (y>1.5) y-=3;
         if (z>1.5) z-=3;
