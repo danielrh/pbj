@@ -1030,10 +1030,10 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,1)<<"inline void set_"<<name->chars<<"(int index, const "<<cppType<<" &value) const {\n";
                 if (isEnum) {
                     sendTabs(ctx,CSBUILD,2)<<"return super.Set"<<uname->chars<<"(index,(_PBJ_Internal";
-                    sendCsNs(ctx,CSBUILD)<<".Types."<<SCOPE_TOP(Symbols)->message->chars<<csType<<")(value));\n";
+                    sendCsNs(ctx,CSBUILD)<<".Types."<<csType<<")(value));\n";
    
                     sendTabs(ctx,2)<<"return super->set_"<<name->chars<<"(index,(_PBJ_Internal";
-                    sendCppNs(ctx,CPPFP)<<"::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")(value));\n";
+                    sendCppNs(ctx,CPPFP)<<"::"<</*SCOPE_TOP(Symbols)->message->chars<<"::"<<*/type->chars<<")(value));\n";
                 }else {
                     if (isFlag) {
                         sendTabs(ctx,CSBUILD,2)<<"super.Set"<<uname->chars<<"(index,value);\n";
@@ -1161,7 +1161,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
             sendTabs(ctx,1)<<"inline void "<<(isRepeated?"add":"set")<<"_"<<name->chars<<"(const "<<cppType<<" &value) const {\n";
             if (isEnum) {
                 sendTabs(ctx,2)<<"super->"<<(isRepeated?"add":"set")<<"_"<<name->chars<<"((_PBJ_Internal";
-                sendCppNs(ctx,CPPFP)<<"::"<<SCOPE_TOP(Symbols)->message->chars<<"::"<<type->chars<<")value);\n";
+                sendCppNs(ctx,CPPFP)<<"::"<</*SCOPE_TOP(Symbols)->message->chars<<"::"<<*/type->chars<<")value);\n";
                 sendTabs(ctx,CSBUILD,2)<<"super."<<(isRepeated?"Add":"")<<uname->chars<<(isRepeated?"":"=")<<"((_PBJ_Internal";
                 sendCsNs(ctx,CSBUILD)<<".Types."<<type->chars<<")value);\n";
 
