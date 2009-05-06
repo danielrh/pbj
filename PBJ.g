@@ -15,6 +15,8 @@ tokens
 scope NameSpace {
     struct LanguageOutputStruct* output;
     pANTLR3_STRING filename;
+    pANTLR3_STRING externalNamespace;
+    pANTLR3_STRING internalNamespace;
     pANTLR3_STRING package;
     pANTLR3_LIST imports;
 }
@@ -48,11 +50,16 @@ protoroot
         initNameSpace(ctx,SCOPE_TOP(NameSpace));
     }
 	:	importrule* package importrule* message*
-	|	(importrule* message* -> PACKAGELITERAL["package"] WS[" "] STRING_LITERAL["_PBJ_Internal"] ITEM_TERMINATOR[";"] WS["\n"] importrule* message*)
+    {
+    }
+	|	(importrule* message* -> PACKAGELITERAL["package"] WS[" "] QUALIFIEDIDENTIFIER[SCOPE_TOP(NameSpace)->externalNamespace->chars] STRING_LITERAL[SCOPE_TOP(NameSpace)->internalNamespace->chars] ITEM_TERMINATOR[";"] WS["\n"] importrule* message*)
+    {
+        definePackage( ctx, NULL );
+    }
 	;
 
 package
-   :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER QUALIFIEDIDENTIFIER["._PBJ_Internal"] ITEM_TERMINATOR WS["\n"])
+   :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER QUALIFIEDIDENTIFIER["."] QUALIFIEDIDENTIFIER[SCOPE_TOP(NameSpace)->externalNamespace->chars] QUALIFIEDIDENTIFIER[SCOPE_TOP(NameSpace)->internalNamespace->chars] ITEM_TERMINATOR WS["\n"])
         {
             definePackage( ctx, $QUALIFIEDIDENTIFIER.text );
         }
