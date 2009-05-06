@@ -28,6 +28,8 @@ int main(int argc, char *argv[])
     char * cppOut=NULL;
     char * cppInclude=NULL;
     int argindex;
+    const char *outputInternalNamespace="_PBJ_Internal";
+    const char *outputExternalNamespace="";
     for (argindex=3;argindex<argc;++argindex) {
         
         if (strncmp(argv[argindex],"--cpp=",6)==0) {
@@ -38,6 +40,12 @@ int main(int argc, char *argv[])
         }
         if (strncmp(argv[argindex],"--include=",10)==0) {
             cppInclude=argv[argindex]+10;
+        }
+        if (strncmp(argv[argindex],"--inamespace=",13)==0) {
+            outputInternalNamespace=argv[argindex]+13;
+        }
+        if (strncmp(argv[argindex],"--namespace=",12)==0) {
+            outputExternalNamespace=argv[argindex]+12;
         }
     }
     
@@ -67,6 +75,14 @@ int main(int argc, char *argv[])
     ctx->pPBJParser_NameSpaceTop=NameSpacePush(ctx);
     SCOPE_TOP(NameSpace)->filename=tstream->tstream->tokenSource->strFactory->newRaw(tstream->tstream->tokenSource->strFactory);
     SCOPE_TOP(NameSpace)->filename->append8(SCOPE_TOP(NameSpace)->filename,(const char*)outputFilename);
+    SCOPE_TOP(NameSpace)->internalNamespace=tstream->tstream->tokenSource->strFactory->newRaw(tstream->tstream->tokenSource->strFactory);
+    SCOPE_TOP(NameSpace)->internalNamespace->append8(SCOPE_TOP(NameSpace)->internalNamespace,(const char*)outputInternalNamespace);
+    SCOPE_TOP(NameSpace)->externalNamespace=tstream->tstream->tokenSource->strFactory->newRaw(tstream->tstream->tokenSource->strFactory);
+    SCOPE_TOP(NameSpace)->externalNamespace->append8(SCOPE_TOP(NameSpace)->externalNamespace,(const char*)outputExternalNamespace);
+    if (strlen(outputExternalNamespace)) {
+        SCOPE_TOP(NameSpace)->externalNamespace->append8(SCOPE_TOP(NameSpace)->externalNamespace,".");        
+    }
+
     SCOPE_TOP(NameSpace)->output=(struct LanguageOutputStruct*)malloc(sizeof(struct LanguageOutputStruct));
     std::fstream cppOutStream,csOutStream;
     SCOPE_TOP(NameSpace)->output->cs=&std::cerr;
