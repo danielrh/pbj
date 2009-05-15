@@ -318,7 +318,7 @@ public:
 template <> class _PBJConstruct<PBJ::UUID> {
 public:
     std::string operator()(const PBJ::UUID&ct) {
-        return ct.rawHexData();
+        return std::string((const char*)ct.getArray().begin(),PBJ::UUID::static_size);
     }
 };
 template <> class _PBJConstruct<PBJ::SHA256> {
@@ -509,7 +509,13 @@ public:
 template <> class _PBJCast<PBJ::UUID> {
 public:
     PBJ::UUID operator()(const std::string bytes) {
-        return PBJ::UUID(bytes,PBJ::UUID::BinaryString());
+        try {
+            return PBJ::UUID(bytes,PBJ::UUID::BinaryString());
+        }catch (std::invalid_argument&ia) {
+            static const char nilcstr[16]={0};
+            static const std::string nilstr(nilcstr,16);
+            return PBJ::UUID(nilstr,PBJ::UUID::BinaryString());
+        }
     }
     PBJ::UUID operator()() {
         return PBJ::UUID::null();
