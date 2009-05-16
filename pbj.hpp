@@ -30,7 +30,6 @@ protected:
         _mMessage=msg;
     }
 public:
-
     void CopyFrom(const Message&from) {
         _mMessage->CopyFrom(from._mMessage);
     }
@@ -236,7 +235,7 @@ public:
     int GetCachedSize() const {
         return _mMessage->GetCachedSize();
     }
-
+    
 };
 
 typedef Sirikata::SHA256 SHA256;
@@ -319,7 +318,7 @@ public:
 template <> class _PBJConstruct<PBJ::UUID> {
 public:
     std::string operator()(const PBJ::UUID&ct) {
-        return ct.rawHexData();
+        return std::string((const char*)ct.getArray().begin(),PBJ::UUID::static_size);
     }
 };
 template <> class _PBJConstruct<PBJ::SHA256> {
@@ -425,7 +424,7 @@ public:
     typedef PBJ::Array3f ArrayType;
     PBJ::Array3f operator()(const PBJ::Quaternion&q) {
         PBJ::Quaternion ct=q/q.length();
-
+        
         float data[3]={ct.x+(ct.w<0?3.0:0.0),ct.y,ct.z};
         return PBJ::Array3f::construct(data);
     }
@@ -501,7 +500,7 @@ public:
             x-=3;
         if (y>1.5)
             y-=3;
-
+        
         return PBJ::Vector3f(x,y,neg-neg*sqrt(x*x+y*y));
     }
 
@@ -510,7 +509,13 @@ public:
 template <> class _PBJCast<PBJ::UUID> {
 public:
     PBJ::UUID operator()(const std::string bytes) {
-        return PBJ::UUID(bytes,PBJ::UUID::BinaryString());
+        try {
+            return PBJ::UUID(bytes,PBJ::UUID::BinaryString());
+        }catch (std::invalid_argument&ia) {
+            static const char nilcstr[16]={0};
+            static const std::string nilstr(nilcstr,16);
+            return PBJ::UUID(nilstr,PBJ::UUID::BinaryString());
+        }
     }
     PBJ::UUID operator()() {
         return PBJ::UUID::null();
@@ -557,7 +562,7 @@ public:
 template <> class _PBJCast<PBJ::Quaternion> {
 public:
     PBJ::Quaternion operator()(float x, float y,float z) {
-        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;
+        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;        
         if (x>1.5) x-=3;
         if (y>1.5) y-=3;
         if (z>1.5) z-=3;
