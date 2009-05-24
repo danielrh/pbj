@@ -832,6 +832,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
     int isRepeated=!notRepeated;
     std::stringstream csShared;
     if (CPPFP) {
+        sendTabs(ctx,1)<<"inline void clear_"<<name->chars<<"() {return super->clear_"<<name->chars<<"();}\n";
         sendTabs(ctx,1)<<"enum {\n";
         sendTabs(ctx,2)<<name->chars<<"_field_tag="<< field_offset<<"\n";
         sendTabs(ctx,1)<<"};\n";
