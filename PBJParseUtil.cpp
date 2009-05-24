@@ -806,7 +806,7 @@ pANTLR3_STRING toVarUpper(pANTLR3_STRING name) {
     free(uname);
     return retval;
 }
-void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isRequired, int isMultiplicitiveAdvancedType){
+void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, unsigned int field_offset, int notRepeated, int isRequired, int isMultiplicitiveAdvancedType){
     if (isMultiplicitiveAdvancedType&&isRequired) {
         SCOPE_TOP(Symbols)->required_advanced_fields->put(SCOPE_TOP(Symbols)->required_advanced_fields,SCOPE_TOP(Symbols)->required_advanced_fields->size(SCOPE_TOP(Symbols)->required_advanced_fields),stringDup(name),&stringFree);
     }
@@ -832,7 +832,9 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
     int isRepeated=!notRepeated;
     std::stringstream csShared;
     if (CPPFP) {
-        sendTabs(ctx,1)<<"inline void clear_"<<name->chars<<"() {return super->clear_"<<name->chars<<"();}\n";
+        sendTabs(ctx,1)<<"enum {\n";
+        sendTabs(ctx,2)<<name->chars<<"_field_tag="<< field_offset<<"\n";
+        sendTabs(ctx,1)<<"};\n";
     }
     if (CSFP) {
         sendTabs(ctx,CSBUILD,1)<<"public Builder Clear"<<uname->chars<<"() { super.Clear"<<uname->chars<<"();return this;}\n";

@@ -33,7 +33,7 @@ void defineEnumValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING 
 void defineFlagValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING flagName, pANTLR3_LIST flagList, pANTLR3_STRING id,  pANTLR3_STRING value);
 void defineEnum(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST enumList);
 void defineFlag(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING id, pANTLR3_LIST flagLis, unsigned int bits);
-void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, int notRepeated, int isRequired, int multiplicitive_advanced_type);
+void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTLR3_STRING value, unsigned int field_offset, int notRepeated, int isRequired, int multiplicitive_advanced_type);
 
 SCOPE_TYPE(NameSpace) NameSpacePush(pPBJParser ctx);
 void NameSpacePop(pPBJParser ctx);
