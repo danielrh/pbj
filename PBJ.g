@@ -30,6 +30,12 @@ scope Symbols {
     pANTLR3_HASH_TABLE flag_values;
     pANTLR3_HASH_TABLE flag_all_on;
     pANTLR3_HASH_TABLE enum_values;
+    int *reserved_range_start;
+    int *reserved_range_end;
+    int num_reserved_ranges;
+    int *extension_range_start;
+    int *extension_range_end;
+    int num_extension_ranges;
     struct CsStreams *cs_streams;
 }
 
@@ -127,11 +133,28 @@ message_element
 	|	enum_def
 	|	flags_def
     |   extensions
+    |   reservations
 	;
 
-extensions : EXTENSIONS integer TO integer_inclusive ITEM_TERMINATOR -> WS["\t"] EXTENSIONS WS[" "] integer WS[" "] TO WS[" "] integer_inclusive ITEM_TERMINATOR WS["\n"] ;
+extensions
+        : 
+        ( EXTENSIONS integer TO integer_inclusive ITEM_TERMINATOR -> WS["\t"] EXTENSIONS WS[" "] integer WS[" "] TO WS[" "] integer_inclusive ITEM_TERMINATOR WS["\n"] )
+        {
+            defineExtensionRange(ctx, $integer.text, $integer_inclusive.text);
+        }
+        ;
 
-integer_inclusive : integer ;
+reservations : (RESERVE integer TO integer_inclusive ITEM_TERMINATOR -> )
+        {
+            defineReservedRange(ctx, $integer.text, $integer_inclusive.text);
+        }
+        ;
+
+integer_inclusive : integer 
+        {
+            
+        }
+        ;
 
 enum_def
     scope {
@@ -348,6 +371,7 @@ DOT :  '.';
 MESSAGE	:	'message';
 EXTEND	:	'extend';
 EXTENSIONS : 'extensions';
+RESERVE : 'reserve';
 TO : 'to';
 // Enum elements
 ENUM	:	'enum';

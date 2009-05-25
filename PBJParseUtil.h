@@ -27,6 +27,8 @@ void defineImport(pPBJParser ctx, pANTLR3_STRING filename);
 void defineType(pPBJParser ctx, pANTLR3_STRING id);
 void defineMessage(pPBJParser ctx, pANTLR3_STRING id);
 void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id);
+void defineExtensionRange(pPBJParser ctx, pANTLR3_STRING extension_start, pANTLR3_STRING extension_end);
+void defineReservedRange(pPBJParser ctx, pANTLR3_STRING extension_start, pANTLR3_STRING extension_end);
 void defineExtension(pPBJParser ctx, pANTLR3_STRING id);
 void defineExtensionEnd(pPBJParser ctx, pANTLR3_STRING id);
 void defineEnumValue(pPBJParser ctx, pANTLR3_STRING messageName, pANTLR3_STRING enumName, pANTLR3_LIST enumList, pANTLR3_STRING id,  pANTLR3_STRING value);
