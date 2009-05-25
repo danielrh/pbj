@@ -65,6 +65,13 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
     
 }
 void  initSymbolTable(SCOPE_TYPE(Symbols) symtab, pANTLR3_STRING messageName, int isExtension) {
+    symtab->num_reserved_ranges=0;
+    symtab->reserved_range_start=NULL;
+    symtab->reserved_range_end=NULL;
+    symtab->num_extension_ranges=0;
+    symtab->extension_range_start=NULL;
+    symtab->extension_range_end=NULL;
+
     symtab->cs_streams=(struct CsStreams*)malloc(sizeof(struct CsStreams));
     memset(symtab->cs_streams,0,sizeof(struct CsStreams));
     symtab->cs_streams->csType=new std::stringstream;
@@ -438,6 +445,20 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
 
         
     }
+}
+void defineExtensionRange(pPBJParser ctx, pANTLR3_STRING extension_start, pANTLR3_STRING extension_end){    
+    SCOPE_TOP(Symbols)->extension_range_start=(int*)realloc(SCOPE_TOP(Symbols)->extension_range_start,SCOPE_TOP(Symbols)->num_extension_ranges+1);
+    SCOPE_TOP(Symbols)->extension_range_end=(int*)realloc(SCOPE_TOP(Symbols)->extension_range_end,SCOPE_TOP(Symbols)->num_extension_ranges+1);
+    SCOPE_TOP(Symbols)->extension_range_start[SCOPE_TOP(Symbols)->num_extension_ranges]=atoi((const char*)extension_start->chars);
+    SCOPE_TOP(Symbols)->extension_range_end[SCOPE_TOP(Symbols)->num_extension_ranges]=atoi((const char*)extension_end->chars);
+    SCOPE_TOP(Symbols)->num_extension_ranges++;
+}
+void defineReservedRange(pPBJParser ctx, pANTLR3_STRING reserved_start, pANTLR3_STRING reserved_end){
+    SCOPE_TOP(Symbols)->reserved_range_start=(int*)realloc(SCOPE_TOP(Symbols)->reserved_range_start,SCOPE_TOP(Symbols)->num_reserved_ranges+1);
+    SCOPE_TOP(Symbols)->reserved_range_end=(int*)realloc(SCOPE_TOP(Symbols)->reserved_range_end,SCOPE_TOP(Symbols)->num_reserved_ranges+1);
+    SCOPE_TOP(Symbols)->reserved_range_start[SCOPE_TOP(Symbols)->num_reserved_ranges]=atoi((const char*)reserved_start->chars);
+    SCOPE_TOP(Symbols)->reserved_range_end[SCOPE_TOP(Symbols)->num_reserved_ranges]=atoi((const char*)reserved_end->chars);
+    SCOPE_TOP(Symbols)->num_reserved_ranges++;
 }
 void defineExtension(pPBJParser ctx, pANTLR3_STRING id){
     openNamespace(ctx);
@@ -838,6 +859,8 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
         sendTabs(ctx,1)<<"};\n";
     }
     if (CSFP) {
+        sendTabs(ctx,csShared,1)<<"public const int "<<uname->chars<<"FieldTag="<< field_offset<<";\n";
+
         sendTabs(ctx,CSBUILD,1)<<"public Builder Clear"<<uname->chars<<"() { super.Clear"<<uname->chars<<"();return this;}\n";
     }
     if (isMultiplicitiveAdvancedType) {
@@ -1288,57 +1311,145 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
         }
         sendTabs(ctx,1)<<"}\n";
         
+        sendTabs(ctx,1)<<"bool within_reserved_field_tag_range(int field_tag) {\n";
+        sendTabs(ctx,2)<<"return false";
+        for (int i=0;i<SCOPE_TOP(Symbols)->num_reserved_ranges;++i) {
+            CPPFP<<"||(field_tag>="<<SCOPE_TOP(Symbols)->reserved_range_start[i]<<
+                "&&field_tag<="<<SCOPE_TOP(Symbols)->reserved_range_end[i]<<")";
+        }
+        CPPFP<<";\n";
+        sendTabs(ctx,1)<<"}\n";
+
+        sendTabs(ctx,1)<<"bool within_extension_field_tag_range(int field_tag) {\n";
+        sendTabs(ctx,2)<<"return false";
+        for (int i=0;i<SCOPE_TOP(Symbols)->num_extension_ranges;++i) {
+            CPPFP<<"||(field_tag>="<<SCOPE_TOP(Symbols)->extension_range_start[i]<<
+                "&&field_tag<="<<SCOPE_TOP(Symbols)->extension_range_end[i]<<")";
+        }
+        CPPFP<<";\n";
+        sendTabs(ctx,1)<<"}\n";
+
+        {
+
+            
+            sendTabs(ctx,1)<<"enum {\n";
+            sendTabs(ctx,2)<<"num_reserved_field_tag_ranges="<<SCOPE_TOP(Symbols)->num_reserved_ranges<<",\n";
+
+            int i;
+            for (i=0;i<SCOPE_TOP(Symbols)->num_reserved_ranges;++i) {
+                sendTabs(ctx,2)<<"reserved_field_tag_start_"<<i<<"="<<SCOPE_TOP(Symbols)->reserved_range_start[i]<<",\n";
+                sendTabs(ctx,2)<<"reserved_field_tag_end_"<<i<<"="<<SCOPE_TOP(Symbols)->reserved_range_end[i]+1;
+                if (i+1!=SCOPE_TOP(Symbols)->num_reserved_ranges||i<3)
+                    CPPFP<<",\n";
+                else
+                    CPPFP<<"\n";
+            }
+            for(;i<3;++i) {
+                sendTabs(ctx,2)<<"reserved_field_tag_start_"<<i<<"=0,\n";
+                sendTabs(ctx,2)<<"reserved_field_tag_end_"<<i<<"=0,\n";
+            }
+            for(;i<4;++i) {
+                sendTabs(ctx,2)<<"reserved_field_tag_start_"<<i<<"=0,\n";
+                sendTabs(ctx,2)<<"reserved_field_tag_end_"<<i<<"=0\n";
+            }
+            sendTabs(ctx,1)<<"};\n";        
+            
+
+
+            sendTabs(ctx,1)<<"enum {\n";
+            sendTabs(ctx,2)<<"num_extension_field_tag_ranges="<<SCOPE_TOP(Symbols)->num_extension_ranges<<",\n";
+
+            for (i=0;i<SCOPE_TOP(Symbols)->num_extension_ranges;++i) {
+                sendTabs(ctx,2)<<"extension_field_tag_start_"<<i<<"="<<SCOPE_TOP(Symbols)->extension_range_start[i]<<",\n";
+                sendTabs(ctx,2)<<"extension_field_tag_end_"<<i<<"="<<SCOPE_TOP(Symbols)->extension_range_end[i]+1;
+                if (i+1!=SCOPE_TOP(Symbols)->num_extension_ranges||i<3)
+                    CPPFP<<",\n";
+                else
+                    CPPFP<<"\n";
+            }
+            for(;i<3;++i) {
+                sendTabs(ctx,2)<<"extension_field_tag_start_"<<i<<"=0,\n";
+                sendTabs(ctx,2)<<"extension_field_tag_end_"<<i<<"=0,\n";
+            }
+            for(;i<4;++i) {
+                sendTabs(ctx,2)<<"extension_field_tag_start_"<<i<<"=0,\n";
+                sendTabs(ctx,2)<<"extension_field_tag_end_"<<i<<"=0\n";
+            }
+            sendTabs(ctx,1)<<"};\n";        
+        }
         sendTabs(ctx,0)<<"};\n";
-        sendTabs(ctx,1)<<"class "<<id->chars<<" : public I"<<id->chars<<" {\n";
-        sendTabs(ctx,1)<<"protected:\n";
-        sendTabs(ctx,2)<<""<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
+        sendTabs(ctx,0)<<"class "<<id->chars<<" : public I"<<id->chars<<" {\n";
+        sendTabs(ctx,0)<<"protected:\n";
+        sendTabs(ctx,1)<<""<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
         sendCppNs(ctx,CPPFP)<<" superconstructed;\n";        
-        sendTabs(ctx,1)<<"public:\n";
-        sendTabs(ctx,2)<<id->chars<<"():I"<<id->chars<<"(superconstructed) {\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,2)<<"}\n";
-        sendTabs(ctx,2)<<id->chars<<"(const "<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
+        sendTabs(ctx,0)<<"public:\n";
+        sendTabs(ctx,1)<<id->chars<<"():I"<<id->chars<<"(superconstructed) {\n";
+        sendTabs(ctx,2)<<"super=&superconstructed;\n";
+        sendTabs(ctx,1)<<"}\n";
+        sendTabs(ctx,1)<<id->chars<<"(const "<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
         sendCppNs(ctx,CPPFP)<<" &copy):I"<<id->chars<<"(superconstructed), superconstructed(copy) {\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,2)<<"}\n";
-        sendTabs(ctx,2)<<id->chars<<"("<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
+        sendTabs(ctx,2)<<"super=&superconstructed;\n";
+        sendTabs(ctx,1)<<"}\n";
+        sendTabs(ctx,1)<<id->chars<<"("<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
         sendCppNs(ctx,CPPFP)<<" &reference):I"<<id->chars<<"(reference) {\n";
-        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,1)<<"}\n";
 
-        sendTabs(ctx,2)<<id->chars<<"(const I"<<id->chars<<" &copy):I"<<id->chars<<"(superconstructed) {\n";
+        sendTabs(ctx,1)<<id->chars<<"(const I"<<id->chars<<" &copy):I"<<id->chars<<"(superconstructed) {\n";
 //        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
-        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,1)<<"}\n";
 
-        sendTabs(ctx,2)<<id->chars<<"(const "<<id->chars<<" &copy):I"<<id->chars<<"(superconstructed) {\n";
+        sendTabs(ctx,1)<<id->chars<<"(const "<<id->chars<<" &copy):I"<<id->chars<<"(superconstructed) {\n";
 //        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
-        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,2)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,1)<<"}\n";
 
-        sendTabs(ctx,2)<<id->chars<<"& operator=(const I"<<id->chars<<" &copy) {\n";
-        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
-        sendTabs(ctx,3)<<"return *this;\n";
-        sendTabs(ctx,2)<<"}\n";
+        sendTabs(ctx,1)<<id->chars<<"& operator=(const I"<<id->chars<<" &copy) {\n";
+        sendTabs(ctx,2)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
+        sendTabs(ctx,2)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,2)<<"return *this;\n";
+        sendTabs(ctx,1)<<"}\n";
 
-        sendTabs(ctx,2)<<id->chars<<"& operator=(const "<<id->chars<<" &copy) {\n";
-        sendTabs(ctx,3)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
-        sendTabs(ctx,3)<<"super=&superconstructed;\n";
-        sendTabs(ctx,3)<<"*super=*copy._PBJSuper();\n";
-        sendTabs(ctx,3)<<"return *this;\n";
-        sendTabs(ctx,2)<<"}\n";
-        sendTabs(ctx,2)<<id->chars<<"* New()const{ return new "<<id->chars<<"; }\n";
+        sendTabs(ctx,1)<<id->chars<<"& operator=(const "<<id->chars<<" &copy) {\n";
+        sendTabs(ctx,2)<<"this->PBJ::Message<I"<<id->chars<<">::setMessageRepresentation(&superconstructed);\n";
+        sendTabs(ctx,2)<<"super=&superconstructed;\n";
+        sendTabs(ctx,2)<<"*super=*copy._PBJSuper();\n";
+        sendTabs(ctx,2)<<"return *this;\n";
+        sendTabs(ctx,1)<<"}\n";
+        sendTabs(ctx,1)<<id->chars<<"* New()const{ return new "<<id->chars<<"; }\n";
 
 
-        sendTabs(ctx,1)<<"};\n";
+        sendTabs(ctx,0)<<"};\n";
 
     }
     if (CSFP) {
+
+
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csType->str();
         sendTabs(ctx,CSFP,1)<<"}\n";//types
+
+
+        sendTabs(ctx,CSFP,1)<<"public static bool WithinReservedFieldTagRange(int field_tag) {\n";
+        sendTabs(ctx,CSFP,2)<<"return false";
+        for (int i=0;i<SCOPE_TOP(Symbols)->num_reserved_ranges;++i) {
+            CSFP<<"||(field_tag>="<<SCOPE_TOP(Symbols)->reserved_range_start[i]<<
+                "&&field_tag<="<<SCOPE_TOP(Symbols)->reserved_range_end[i]<<")";
+        }
+        CSFP<<";\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+
+        sendTabs(ctx,CSFP,1)<<"public static bool WithinExtensionFieldTagRange(int field_tag) {\n";
+        sendTabs(ctx,CSFP,2)<<"return false";
+        for (int i=0;i<SCOPE_TOP(Symbols)->num_extension_ranges;++i) {
+            CSFP<<"||(field_tag>="<<SCOPE_TOP(Symbols)->extension_range_start[i]<<
+                "&&field_tag<="<<SCOPE_TOP(Symbols)->extension_range_end[i]<<")";
+        }
+        CSFP<<";\n";
+        sendTabs(ctx,CSFP,1)<<"}\n";
+
         CSFP<<SCOPE_TOP(Symbols)->cs_streams->csMembers->str();
         bool subMessage=isSubMessage(ctx,-1);
         sendTabs(ctx,CSFP,2)<<"public override Google.ProtocolBuffers.IMessage _PBJISuper { get { return super; } }\n";
