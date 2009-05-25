@@ -1311,7 +1311,7 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
         }
         sendTabs(ctx,1)<<"}\n";
         
-        sendTabs(ctx,1)<<"bool within_reserved_field_tag_range(int field_tag) {\n";
+        sendTabs(ctx,1)<<"static bool within_reserved_field_tag_range(int field_tag) {\n";
         sendTabs(ctx,2)<<"return false";
         for (int i=0;i<SCOPE_TOP(Symbols)->num_reserved_ranges;++i) {
             CPPFP<<"||(field_tag>="<<SCOPE_TOP(Symbols)->reserved_range_start[i]<<
@@ -1320,7 +1320,7 @@ void defineMessageEnd(pPBJParser ctx, pANTLR3_STRING id){
         CPPFP<<";\n";
         sendTabs(ctx,1)<<"}\n";
 
-        sendTabs(ctx,1)<<"bool within_extension_field_tag_range(int field_tag) {\n";
+        sendTabs(ctx,1)<<"static bool within_extension_field_tag_range(int field_tag) {\n";
         sendTabs(ctx,2)<<"return false";
         for (int i=0;i<SCOPE_TOP(Symbols)->num_extension_ranges;++i) {
             CPPFP<<"||(field_tag>="<<SCOPE_TOP(Symbols)->extension_range_start[i]<<
