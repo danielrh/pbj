@@ -479,15 +479,15 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
     }
 }
 void defineExtensionRange(pPBJParser ctx, pANTLR3_STRING extension_start, pANTLR3_STRING extension_end){    
-    SCOPE_TOP(Symbols)->extension_range_start=(int*)realloc(SCOPE_TOP(Symbols)->extension_range_start,SCOPE_TOP(Symbols)->num_extension_ranges+1);
-    SCOPE_TOP(Symbols)->extension_range_end=(int*)realloc(SCOPE_TOP(Symbols)->extension_range_end,SCOPE_TOP(Symbols)->num_extension_ranges+1);
+    SCOPE_TOP(Symbols)->extension_range_start=(int*)realloc(SCOPE_TOP(Symbols)->extension_range_start,sizeof(int)*(SCOPE_TOP(Symbols)->num_extension_ranges+1));
+    SCOPE_TOP(Symbols)->extension_range_end=(int*)realloc(SCOPE_TOP(Symbols)->extension_range_end,sizeof(int)*(SCOPE_TOP(Symbols)->num_extension_ranges+1));
     SCOPE_TOP(Symbols)->extension_range_start[SCOPE_TOP(Symbols)->num_extension_ranges]=atoi((const char*)extension_start->chars);
     SCOPE_TOP(Symbols)->extension_range_end[SCOPE_TOP(Symbols)->num_extension_ranges]=atoi((const char*)extension_end->chars);
     SCOPE_TOP(Symbols)->num_extension_ranges++;
 }
 void defineReservedRange(pPBJParser ctx, pANTLR3_STRING reserved_start, pANTLR3_STRING reserved_end){
-    SCOPE_TOP(Symbols)->reserved_range_start=(int*)realloc(SCOPE_TOP(Symbols)->reserved_range_start,SCOPE_TOP(Symbols)->num_reserved_ranges+1);
-    SCOPE_TOP(Symbols)->reserved_range_end=(int*)realloc(SCOPE_TOP(Symbols)->reserved_range_end,SCOPE_TOP(Symbols)->num_reserved_ranges+1);
+    SCOPE_TOP(Symbols)->reserved_range_start=(int*)realloc(SCOPE_TOP(Symbols)->reserved_range_start,sizeof(int)*(SCOPE_TOP(Symbols)->num_reserved_ranges+1));
+    SCOPE_TOP(Symbols)->reserved_range_end=(int*)realloc(SCOPE_TOP(Symbols)->reserved_range_end,sizeof(int)*(SCOPE_TOP(Symbols)->num_reserved_ranges+1));
     SCOPE_TOP(Symbols)->reserved_range_start[SCOPE_TOP(Symbols)->num_reserved_ranges]=atoi((const char*)reserved_start->chars);
     SCOPE_TOP(Symbols)->reserved_range_end[SCOPE_TOP(Symbols)->num_reserved_ranges]=atoi((const char*)reserved_end->chars);
     SCOPE_TOP(Symbols)->num_reserved_ranges++;
