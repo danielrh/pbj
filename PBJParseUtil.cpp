@@ -1161,6 +1161,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     (isSubMessage?sendCppNs(ctx,CPPFP):CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"()));\n";
                     sendTabs(ctx,csShared,3)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super."<<uname->chars<<");\n";
                 } else if (isEnum) {
+                    sendTabs(ctx,3)<<"return _PBJCast< "<<pbjType<<">()(super->"<<name->chars<<"());";
                     sendTabs(ctx,csShared,3)<<"return (Types."<<type->chars<<")super."<<uname->chars<<";\n";
                 } else if (isFlag) {
                     sendTabs(ctx,3)<<"return _PBJCastFlags< "<<pbjType<<">()(super->"<<name->chars<<"(),";
