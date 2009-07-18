@@ -41,6 +41,7 @@
 #include "util/Sha256.hpp"
 
 #include <google/protobuf/message.h>
+#include <cmath>
 namespace PBJ {
 
 class HasFields {
@@ -482,6 +483,28 @@ public:
     }
 };
 
+#if 0
+template <class Type> inline bool _PBJIsFinite(Type val) {
+    return Type::error_not_supported;
+}
+
+template <> inline bool _PBJIsFinite<float>(float val) {
+    PBJ::uint32 ieeeval = (PBJ::uint32&)val;
+    PBJ::uint32 infmask = 0x7f800000;
+    return (ieeeval & infmask) != infmask; // check less than "infinity"
+}
+
+template <> inline bool _PBJIsFinite<double>(double val) {
+    PBJ::uint64 ieeeval = (PBJ::uint64&)val;
+    PBJ::uint64 infmask = (((PBJ::uint64)0x7ff00000)<<32);
+    return (ieeeval & infmask) != infmask; // check less than "infinity"
+}
+#endif
+template <class Type> inline bool _PBJIsFinite(Type val) {
+    return std::isfinite(val);
+}
+
+
 
 template <typename convertFrom, typename convertTo> class _PBJCastMessage {
 public:
@@ -529,6 +552,9 @@ public:
         return PBJ::Vector3f(0,0,1);
     }
     PBJ::Vector3f operator()(float x, float y) {
+        if (!_PBJIsFinite(x) || !_PBJIsFinite(y)) {
+            return PBJ::Vector3f(0,0,0);
+        }
         float neg=(x>1.5||y>1.5)?-1.0:1.0;
         if (x>1.5)
             x-=3;
@@ -567,6 +593,9 @@ public:
 template <> class _PBJCast<PBJ::angle> {
 public:
     float operator()(const float ang) {
+        if (!_PBJIsFinite(ang)) {
+            return operator()();
+        }
         return ang;
     }
     float operator()() {
@@ -596,6 +625,9 @@ public:
 template <> class _PBJCast<PBJ::Quaternion> {
 public:
     PBJ::Quaternion operator()(float x, float y,float z) {
+        if (!_PBJIsFinite(x) || !_PBJIsFinite(y) || !_PBJIsFinite(z)) {
+            return operator()();
+        }
         float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;
         if (x>1.5) x-=3;
         if (y>1.5) y-=3;
@@ -668,6 +700,12 @@ public:
 template <> class _PBJCast<PBJ::BoundingSphere3f> {
 public:
     PBJ::BoundingSphere3f operator()(float x, float y, float z, float r) {
+        if (!_PBJIsFinite(x) || !_PBJIsFinite(y) || !_PBJIsFinite(z)) {
+            x=y=z=0;
+        }
+        if (r<0) {
+            r=0;
+        }
         return PBJ::BoundingSphere3f(PBJ::Vector3f(x,y,z),r);
     }
     PBJ::BoundingSphere3f operator()() {
@@ -677,6 +715,12 @@ public:
 template <> class _PBJCast<PBJ::BoundingSphere3d> {
 public:
     PBJ::BoundingSphere3d operator()(double x, double y, double z, float r) {
+        if (!_PBJIsFinite(x) || !_PBJIsFinite(y) || !_PBJIsFinite(z)) {
+            x=y=z=0;
+        }
+        if (r<0) {
+            r=0;
+        }
         return PBJ::BoundingSphere3d(PBJ::Vector3d(x,y,z),r);
     }
     PBJ::BoundingSphere3d operator()() {
@@ -688,6 +732,12 @@ public:
 template <> class _PBJCast<PBJ::BoundingBox3f3f> {
 public:
     PBJ::BoundingBox3f3f operator()(float x, float y, float z, float w, float h, float d) {
+        if (!_PBJIsFinite(x) || !_PBJIsFinite(y) || !_PBJIsFinite(z)) {
+            x=y=z=0;
+        }
+        if (w<0) w=0;
+        if (h<0) h=0;
+        if (d<0) d=0;
         return PBJ::BoundingBox3f3f(PBJ::Vector3f(x,y,z),PBJ::Vector3f(x+w,y+h,z+d));
     }
     PBJ::BoundingBox3f3f operator()() {
@@ -697,6 +747,12 @@ public:
 template <> class _PBJCast<PBJ::BoundingBox3d3f> {
 public:
     PBJ::BoundingBox3d3f operator()(double x, double y, double z, double w, double h, double d) {
+        if (!_PBJIsFinite(x) || !_PBJIsFinite(y) || !_PBJIsFinite(z)) {
+            x=y=z=0;
+        }
+        if (w<0) w=0;
+        if (h<0) h=0;
+        if (d<0) d=0;
         return PBJ::BoundingBox3d3f(PBJ::Vector3d(x,y,z),PBJ::Vector3d(x+w,y+h,z+d));
     }
     PBJ::BoundingBox3d3f operator()() {
