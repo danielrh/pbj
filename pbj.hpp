@@ -534,8 +534,8 @@ public:
             x-=3;
         if (y>1.5)
             y-=3;
-        
-        return PBJ::Vector3f(x,y,neg-neg*sqrt(x*x+y*y));
+
+        return PBJ::Vector3f(x,y,neg*sqrt(1-x*x-y*y));
     }
 
 };
@@ -596,11 +596,11 @@ public:
 template <> class _PBJCast<PBJ::Quaternion> {
 public:
     PBJ::Quaternion operator()(float x, float y,float z) {
-        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;        
+        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;
         if (x>1.5) x-=3;
         if (y>1.5) y-=3;
         if (z>1.5) z-=3;
-        return PBJ::Quaternion(x,y,z,neg-neg*sqrt(x*x+y*y+z*z),PBJ::Quaternion::XYZW());
+        return PBJ::Quaternion(x,y,z,neg*sqrt(1-x*x-y*y-z*z),PBJ::Quaternion::XYZW());
     }
     PBJ::Quaternion operator()() {
         return PBJ::Quaternion::identity();
@@ -656,7 +656,7 @@ public:
 };
 template <> class _PBJCast<PBJ::Vector4d> {
 public:
-    PBJ::Vector4d operator()(double x, double y, double z, float w) {
+    PBJ::Vector4d operator()(double x, double y, double z, double w) {
         return PBJ::Vector4d(x,y,z,w);
     }
     PBJ::Vector4d operator()() {
@@ -667,7 +667,7 @@ public:
 
 template <> class _PBJCast<PBJ::BoundingSphere3f> {
 public:
-    PBJ::BoundingSphere3f operator()(double x, double y, double z, float r) {
+    PBJ::BoundingSphere3f operator()(float x, float y, float z, float r) {
         return PBJ::BoundingSphere3f(PBJ::Vector3f(x,y,z),r);
     }
     PBJ::BoundingSphere3f operator()() {
@@ -687,7 +687,7 @@ public:
 
 template <> class _PBJCast<PBJ::BoundingBox3f3f> {
 public:
-    PBJ::BoundingBox3f3f operator()(double x, double y, double z, float w, float h, float d) {
+    PBJ::BoundingBox3f3f operator()(float x, float y, float z, float w, float h, float d) {
         return PBJ::BoundingBox3f3f(PBJ::Vector3f(x,y,z),PBJ::Vector3f(x+w,y+h,z+d));
     }
     PBJ::BoundingBox3f3f operator()() {
