@@ -66,10 +66,10 @@ protected:
     }
 public:
     void CopyFrom(const Message&from) {
-        _mMessage->CopyFrom(from._mMessage);
+        _mMessage->CopyFrom(*from._mMessage);
     }
     void MergeFrom(const Message&from) {
-        _mMessage->MergeFrom(from._mMessage);
+        _mMessage->MergeFrom(*from._mMessage);
     }
     void Clear() {
         _mMessage->Clear();
