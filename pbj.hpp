@@ -483,7 +483,7 @@ public:
     }
 };
 
-#if 0
+#ifdef _WIN32
 template <class Type> inline bool _PBJIsFinite(Type val) {
     return Type::error_not_supported;
 }
@@ -499,11 +499,11 @@ template <> inline bool _PBJIsFinite<double>(double val) {
     PBJ::uint64 infmask = (((PBJ::uint64)0x7ff00000)<<32);
     return (ieeeval & infmask) != infmask; // check less than "infinity"
 }
-#endif
+#else
 template <class Type> inline bool _PBJIsFinite(Type val) {
     return std::isfinite(val);
 }
-
+#endif
 
 
 template <typename convertFrom, typename convertTo> class _PBJCastMessage {
