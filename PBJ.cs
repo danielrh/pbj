@@ -1428,6 +1428,9 @@ public static B CastBytes<B>(B input) {
 
 
 
+public static bool CastBool() {
+    return false;
+}
 public static double CastDouble() {
     return 0;
 }
