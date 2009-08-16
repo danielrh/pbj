@@ -58,13 +58,15 @@ void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
 }
 std::string defineable(const unsigned char*dat) {
     std::string retval;
+    bool first=true;
     while(*dat) {
         if ((*dat>='0'&&*dat<='9')||
             (*dat>='a'&&*dat<='z')||
             (*dat>='A'&&*dat<='Z')||
             (*dat=='_')) {
             retval+=*dat;
-        }else {
+            first=false;
+        }else if (!first) {
             retval+='_';
         }
         ++dat;
