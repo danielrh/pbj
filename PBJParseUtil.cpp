@@ -56,7 +56,25 @@ void  freeSymbolTable(SCOPE_TYPE(Symbols) symtab) {
     symtab->cs_streams=NULL;
        
 }
+std::string defineable(const unsigned char*dat) {
+    std::string retval;
+    while(*dat) {
+        if ((*dat>='0'&&*dat<='9')||
+            (*dat>='a'&&*dat<='z')||
+            (*dat>='A'&&*dat<='Z')||
+            (*dat=='_')) {
+            retval+=*dat;
+        }else {
+            retval+='_';
+        }
+        ++dat;
+    }
+    return retval;
+}
 void  freeNameSpace(SCOPE_TYPE(NameSpace) symtab) {
+    if (symtab->output->cpp) {
+        *symtab->output->cpp<<"#endif\n";
+    }
     symtab->imports->free(symtab->imports);
     //delete symtab->output->cpp;    
 }
@@ -79,6 +97,9 @@ void  initNameSpace(pPBJParser ctx, SCOPE_TYPE(NameSpace) symtab) {
             symtab->filename->chars[symtab->filename->len-6]='\0';
         }
         if (symtab->output->cpp) {
+            *symtab->output->cpp<<"#ifndef "<<defineable(symtab->internalNamespace->chars)<<(symtab->externalNamespace->len?'_'+defineable(symtab->externalNamespace->chars)+'_':"_")<<defineable(symtab->filename->chars)<<'\n';
+            *symtab->output->cpp<<"#define "<<defineable(symtab->internalNamespace->chars)<<(symtab->externalNamespace->len?'_'+defineable(symtab->externalNamespace->chars)+'_':"_")<<defineable(symtab->filename->chars)<<'\n';
+            
             *symtab->output->cpp<<"#include \"pbj.hpp\"\n";
             *symtab->output->cpp<<"#include \""<<symtab->filename->chars<<".pb.h\"\n";
         }
