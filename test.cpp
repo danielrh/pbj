@@ -1,4 +1,6 @@
+#include <util/Platform.hpp>
 #include "output.pbj.hpp"
+using namespace Sirikata;
 using namespace Sirikata::PB;
 int main (int argc, char**argv) {
     TestMessage tm;
@@ -27,6 +29,15 @@ int main (int argc, char**argv) {
     assert(ti.extmesser().sub_mes().subvector().x==8);
     assert(ti.extmesser().sub_mes().subvector().y==9);
     assert(ti.extmesser().sub_mes().subvector().z==10);
+    Content c;
+    c.mutable_c().mutable_vec().set_p(Sirikata::Vector3f(1,2,3));
+    c.mutable_c().mutable_vec().set_t(Sirikata::Time::epoch());
+    std::string cstr;
+    c.SerializeToString(&cstr);
+    Content cc;
+    cc.ParseFromString(cstr);
+    Stuff ss=cc.c();
+    TimedVector itv=ss.vec();
     return 0;
 }
 
