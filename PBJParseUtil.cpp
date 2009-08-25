@@ -437,6 +437,17 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendTabs(ctx,3)<<"super=&reference;\n";
         sendTabs(ctx,2)<<"}\n";
 
+        sendTabs(ctx,2)<<"template <class T> I"<<id->chars<<"(const PBJ::RefClass<T> &other) : PBJ::Message<I"<<id->chars<<">(const_cast<PBJ::RefClass<T>*>(&other)->_PBJSuper()) {\n";
+        sendTabs(ctx,3)<<"super=const_cast<PBJ::RefClass<T>*>(&other)->_PBJSuper();\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<"template <class T> I"<<id->chars<<"& operator=(const PBJ::RefClass<T> &other){\n";
+        sendTabs(ctx,3)<<"setMessageRepresentation(const_cast<PBJ::RefClass<T>*>(&other)->_PBJSuper());\n";
+        sendTabs(ctx,3)<<"super=const_cast<PBJ::RefClass<T>*>(&other)->_PBJSuper();\n";
+        sendTabs(ctx,3)<<"return *this;\n";
+        sendTabs(ctx,2)<<"}\n";
+
+
 
         sendTabs(ctx,2)<<"I"<<id->chars<<"(I"<<id->chars<<" &reference):PBJ::Message< I"<<id->chars<<" >(reference._PBJSuper()) {\n";
         sendTabs(ctx,3)<<"super=reference._PBJSuper();\n";
@@ -1126,7 +1137,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,CSBUILD,2)<<"return this;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
                 
-                sendTabs(ctx,1)<<"inline I"<<cppType<<" mutable_"<<name->chars<<"(int index) {\n";
+                sendTabs(ctx,1)<<"inline PBJ::RefClass<I"<<cppType<<"> mutable_"<<name->chars<<"(int index) {\n";
                 sendTabs(ctx,2)<<"I"<<cppType<<" retval(*super->mutable_"<<name->chars<<"(index));\n";
                 sendTabs(ctx,2)<<"return retval;\n";
                 sendTabs(ctx,1)<<"}\n";
@@ -1256,7 +1267,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,CSBUILD,2)<<"super."<<uname->chars<<"=value._PBJSuper;\n";
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
             }
-            sendTabs(ctx,1)<<"inline I"<<cppType<<" "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
+            sendTabs(ctx,1)<<"inline PBJ::RefClass<I"<<cppType<<"> "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
             sendTabs(ctx,2)<<"I"<<cppType<<" retval(*super->"<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"());\n";
             sendTabs(ctx,2)<<"return retval;\n";
             sendTabs(ctx,1)<<"}\n";

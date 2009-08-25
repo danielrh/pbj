@@ -273,6 +273,13 @@ public:
     
 };
 
+template <class T> class RefClass : public T{
+public:
+    RefClass(const T&t):T(*const_cast<T*>(&t)){}
+};
+
+
+
 typedef Sirikata::SHA256 SHA256;
 typedef Sirikata::UUID UUID;
 typedef Sirikata::uint64 uint64;
