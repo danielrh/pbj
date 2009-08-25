@@ -30,8 +30,9 @@ int main (int argc, char**argv) {
     assert(ti.extmesser().sub_mes().subvector().y==9);
     assert(ti.extmesser().sub_mes().subvector().z==10);
     Content c;
-    c.mutable_c().mutable_vec().set_p(Sirikata::Vector3f(1,2,3));
-    c.mutable_c().mutable_vec().set_t(Sirikata::Time::epoch());
+    ITimedVector xtv = c.mutable_c().mutable_vec();
+    xtv.set_p(Sirikata::Vector3f(1,2,3));
+    xtv.set_t(Sirikata::Time::epoch());
     std::string cstr;
     c.SerializeToString(&cstr);
     Content cc;
