@@ -430,10 +430,22 @@ void defineMessage(pPBJParser ctx, pANTLR3_STRING id){
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"* _PBJSuper(){ return super; }\n";
         sendTabs(ctx,2)<<"const "<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<"* _PBJSuper()const{ return super; }\n";
-
+        sendTabs(ctx,2)<<"typedef "<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
+        sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" _PBJ_SubType;\n";
         sendTabs(ctx,2)<<"I"<<id->chars<<"("<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
         sendCppNs(ctx,CPPFP)<<"::"<<id->chars<<" &reference):PBJ::Message< I"<<id->chars<<" >(&reference) {\n";
         sendTabs(ctx,3)<<"super=&reference;\n";
+        sendTabs(ctx,2)<<"}\n";
+
+
+        sendTabs(ctx,2)<<"I"<<id->chars<<"(I"<<id->chars<<" &reference):PBJ::Message< I"<<id->chars<<" >(reference._PBJSuper()) {\n";
+        sendTabs(ctx,3)<<"super=reference._PBJSuper();\n";
+        sendTabs(ctx,2)<<"}\n";
+
+        sendTabs(ctx,2)<<"I"<<id->chars<<"& operator=(I"<<id->chars<<" &reference){\n";
+        sendTabs(ctx,3)<<"setMessageRepresentation(reference._PBJSuper());\n";
+        sendTabs(ctx,3)<<"super=reference._PBJSuper();\n";
+        sendTabs(ctx,3)<<"return *this;\n";
         sendTabs(ctx,2)<<"}\n";
 
 
@@ -1064,13 +1076,13 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                     sendTabs(ctx,csShared,1)<<"public bool Has"<<uname->chars<<"(int index) {return PBJ._PBJ.Validate"<<utype->chars<<"(super.Get"<<uname->chars<<"(index));}\n";
                 }
                 sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"(int index) {\n";
-                sendTabs(ctx,1)<<"inline "<<(isMessageType?"I":"")<<(isRawByteArray?"const std::string&":cppType)<<" "<<name->chars<<"(int index) const {\n";
+                sendTabs(ctx,1)<<"inline "<<(isMessageType?"":"")<<(isRawByteArray?"const std::string&":cppType)<<" "<<name->chars<<"(int index) const {\n";
                 if (value) {
                     sendTabs(ctx,2)<<"if (has_"<<name->chars<<"(index)) {\n";
                     sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<"(index)) {\n";
                 }
                 if (isMessageType) {
-                    sendTabs(ctx,value?3:2)<<"return I"<<cppType<<"(*const_cast<"<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
+                    sendTabs(ctx,value?3:2)<<"return "<<cppType<<"(*const_cast<"<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
 
                     (isSubMessage?sendCppNs(ctx,CPPFP):CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"(index)));\n";
                     sendTabs(ctx,csShared,value?3:2)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super.Get"<<uname->chars<<"(index));\n";//FIXME:cast
@@ -1115,7 +1127,8 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
                 
                 sendTabs(ctx,1)<<"inline I"<<cppType<<" mutable_"<<name->chars<<"(int index) {\n";
-                sendTabs(ctx,2)<<"return *super->mutable_"<<name->chars<<"(index);\n";
+                sendTabs(ctx,2)<<"I"<<cppType<<" retval(*super->mutable_"<<name->chars<<"(index));\n";
+                sendTabs(ctx,2)<<"return retval;\n";
                 sendTabs(ctx,1)<<"}\n";
             }else {
                 sendTabs(ctx,CSBUILD,1)<<"public Builder Set"<<uname->chars<<"(int index, "<<csType<<" value) {\n";
@@ -1180,7 +1193,7 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,csShared,1)<<"public "<<csType<<" "<<uname->chars<<"{ get {\n";
                 sendTabs(ctx,csShared,2)<<"if (Has"<<uname->chars<<") {\n";
                 if (isMessageType) {
-                    sendTabs(ctx,3)<<"return I"<<type->chars<<"(*const_cast<"<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
+                    sendTabs(ctx,3)<<"return "<<type->chars<<"(*const_cast<"<<SCOPE_TOP(NameSpace)->internalNamespace->chars<<"";
                     (isSubMessage?sendCppNs(ctx,CPPFP):CPPFP)<<"::"<<type->chars<<"*>(&super->"<<name->chars<<"()));\n";
                     sendTabs(ctx,csShared,3)<<"return new "<<(isSubMessage?"Types.":"")<<type->chars<<"(super."<<uname->chars<<");\n";
                 } else if (isEnum) {
@@ -1244,7 +1257,8 @@ void defineField(pPBJParser ctx, pANTLR3_STRING type, pANTLR3_STRING name, pANTL
                 sendTabs(ctx,CSBUILD,1)<<"}\n";
             }
             sendTabs(ctx,1)<<"inline I"<<cppType<<" "<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"() {\n";
-            sendTabs(ctx,2)<<"return *super->"<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"();\n";
+            sendTabs(ctx,2)<<"I"<<cppType<<" retval(*super->"<<(isRepeated?"add":"mutable")<<"_"<<name->chars<<"());\n";
+            sendTabs(ctx,2)<<"return retval;\n";
             sendTabs(ctx,1)<<"}\n";
         }else {
             if (isRepeated) {
