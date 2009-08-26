@@ -467,7 +467,7 @@ public:
     PBJ::Array3f operator()(const PBJ::Quaternion&q) {
         PBJ::Quaternion ct=q/q.length();
         
-        float data[3]={ct.x+(ct.w<0?3.0:0.0),ct.y,ct.z};
+        float data[3]={ct.x+(ct.w<0.0f?3.0f:0.0f),ct.y,ct.z};
         return PBJ::Array3f::construct(data);
     }
 };
@@ -562,11 +562,11 @@ public:
         if (!_PBJIsFinite(x) || !_PBJIsFinite(y)) {
             return PBJ::Vector3f(0,0,0);
         }
-        float neg=(x>1.5||y>1.5)?-1.0:1.0;
-        if (x>1.5)
-            x-=3;
-        if (y>1.5)
-            y-=3;
+        float neg=(x>1.5f||y>1.5f)?-1.0f:1.0f;
+        if (x>1.5f)
+            x-=3.0f;
+        if (y>1.5f)
+            y-=3.0f;
 
         return PBJ::Vector3f(x,y,neg*sqrt(1-x*x-y*y));
     }
@@ -578,7 +578,7 @@ public:
     PBJ::UUID operator()(const std::string bytes) {
         try {
             return PBJ::UUID(bytes,PBJ::UUID::BinaryString());
-        }catch (std::invalid_argument&ia) {
+        }catch (std::invalid_argument&) {
             static const char nilcstr[16]={0};
             static const std::string nilstr(nilcstr,16);
             return PBJ::UUID(nilstr,PBJ::UUID::BinaryString());
@@ -635,10 +635,10 @@ public:
         if (!_PBJIsFinite(x) || !_PBJIsFinite(y) || !_PBJIsFinite(z)) {
             return operator()();
         }
-        float neg=(x>1.5||y>1.5||z>1.5)?-1.0:1.0;
-        if (x>1.5) x-=3;
-        if (y>1.5) y-=3;
-        if (z>1.5) z-=3;
+        float neg=(x>1.5f||y>1.5f||z>1.5f)?-1.0f:1.0f;
+        if (x>1.5f) x-=3.0f;
+        if (y>1.5f) y-=3.0f;
+        if (z>1.5f) z-=3.0f;
         return PBJ::Quaternion(x,y,z,neg*sqrt(1-x*x-y*y-z*z),PBJ::Quaternion::XYZW());
     }
     PBJ::Quaternion operator()() {
