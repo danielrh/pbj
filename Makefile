@@ -3,13 +3,15 @@ tpbj: output.pbj.hpp output.pb.h test.cpp pbj.hpp cspbj.exe
 	g++ -m32 -std=c++98 -Wall -g -o tpbj test.cpp output.pb.cc ${SIRIKATA}/dependencies/installed-protobufs/lib/libprotobuf.a -Wall -I${SIRIKATA}/dependencies/include	-I${SIRIKATA}/libcore/src -I${SIRIKATA}//dependencies/installed-protobufs/include -I${SIRIKATA}/dependencies/include/boost-1_35 -I${SIRIKATA}/dependencies/installed-boost/include/boost-1_37 -lpthread
 
 cspbj.exe: Output.pbj.cs Output.cs Test.cs pbj.hpp
-	${SIRIKATA}/dependencies/installed-mono/bin/gmcs -r:${SIRIKATA}/dependencies/installed-protobufs/bin/Google.ProtocolBuffers.dll Output.pbj.cs Output.cs Test.cs PBJ.cs -o cspbj.exe
+	${SIRIKATA}/dependencies/installed-mono/bin/gmcs -r:${SIRIKATA}/dependencies/installed-protobufs/bin/Google.ProtocolBuffers.dll Output.pbj.cs Output.cs Test.cs PBJ.cs -out:cspbj.exe
 output.pb.h: output.pbj.hpp
 	${SIRIKATA}/dependencies/installed-protobufs/bin/protoc --cpp_out=. output.proto
 Output.cs:output.proto
 	${SIRIKATA}/dependencies/installed-protobufs/bin/protoc --descriptor_set_out=output.protobin -I. output.proto
 	${SIRIKATA}/dependencies/installed-mono/bin/mono ${SIRIKATA}/dependencies/installed-protobufs/bin/ProtoGen.exe output.protobin
 output.pbj.cs: pbj output.proto protocol/Test.pbj
+	./pbj protocol/Test.pbj output.proto 1> output.pbj.hpp 2> Output.pbj.cs
+output.proto: pbj protocol/Test.pbj
 	./pbj protocol/Test.pbj output.proto 1> output.pbj.hpp 2> Output.pbj.cs
 output.pbj.hpp: pbj output.proto protocol/Test.pbj
 	./pbj protocol/Test.pbj output.proto 1> output.pbj.hpp 2> Output.pbj.cs
