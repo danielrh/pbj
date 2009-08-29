@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     pbjAST=psr->protocol(psr);
     if (psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec) > 0)
     {
-        ANTLR3_FPRINTF(stderr, "The parser returned \%d errors, tree walking aborted.\n", psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec));
+        ANTLR3_FPRINTF(stderr, "The parser returned %d errors, tree walking aborted.\n", psr->pParser->rec->getNumberOfSyntaxErrors(psr->pParser->rec));
  
     }
     else

@@ -259,7 +259,7 @@ field
         int fieldOffset;
     }
     @init {$field::defaultValue=NULL;}
-    :  ( ( (OPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
+    :  ( ( (PBJOPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
     {
         defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$field::fieldOffset,$REPEATED==NULL,$REQUIRED!=NULL,1);
         stringFree($field::fieldName);
@@ -267,7 +267,7 @@ field
         stringFree($field::defaultValue);
     }
      |
-     (( (OPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] OPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
+     (( (PBJOPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] PBJOPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
       | 
       ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
     {
@@ -438,7 +438,7 @@ FLAGS64	:	'flags64';
 
 // Field elements
 REQUIRED:	'required';
-OPTIONAL:	'optional';
+PBJOPTIONAL:	'optional';
 REPEATED:	'repeated';
 
 DEFAULT	:	'default';
