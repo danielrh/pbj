@@ -29,6 +29,7 @@ int main (int argc, char**argv) {
     assert(ti.extmesser().sub_mes().subvector().x==8);
     assert(ti.extmesser().sub_mes().subvector().y==9);
     assert(ti.extmesser().sub_mes().subvector().z==10);
+/*
     Content c;
     ITimedVector xtv = c.mutable_c().mutable_vec();
     xtv.set_p(Sirikata::Vector3f(1,2,3));
@@ -39,6 +40,7 @@ int main (int argc, char**argv) {
     cc.ParseFromString(cstr);
     Stuff ss=cc.c();
     TimedVector itv=ss.vec();
+*/
     return 0;
 }
 

@@ -257,9 +257,10 @@ field
         ///protobuf value if it is an advanced_type or default kind of type...  C++ value if it's a multiplicitve type
         pANTLR3_STRING defaultValue;
         int fieldOffset;
+        int isNumericType;
     }
-    @init {$field::defaultValue=NULL;}
-    :  ( ( (PBJOPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] )
+    @init {$field::defaultValue=NULL; $field::isNumericType=0;}
+    :  ( ( (PBJOPTIONAL multiplicitive_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR ) | ( (REQUIRED|REPEATED) multiplicitive_type field_name EQUALS field_offset ITEM_TERMINATOR ) ) -> WS["\t"] REPEATED["repeated"] WS[" "] multiplicitive_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] SQBRACKET_OPEN["["] IDENTIFIER["packed"] EQUALS["="] BOOL_LITERAL["true"] SQBRACKET_CLOSE["]"] ITEM_TERMINATOR WS["\n"] )
     {
         defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$field::fieldOffset,$REPEATED==NULL,$REQUIRED!=NULL,1);
         stringFree($field::fieldName);
@@ -269,7 +270,9 @@ field
      |
      (( (PBJOPTIONAL field_type field_name EQUALS field_offset default_value? ITEM_TERMINATOR )  -> WS["\t"] PBJOPTIONAL WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset WS[" "] default_value ITEM_TERMINATOR WS["\n"] )
       | 
-      ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
+      ( ( (REQUIRED|REPEATED) field_type field_name EQUALS field_offset ITEM_TERMINATOR ) 
+          -> {$field::isNumericType && $REQUIRED==NULL}?WS["\t"] REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset  WS[" "] SQBRACKET_OPEN["["] IDENTIFIER["packed"] EQUALS["="] BOOL_LITERAL["true"] SQBRACKET_CLOSE["]"] ITEM_TERMINATOR WS["\n"]  
+          -> WS["\t"] REQUIRED REPEATED WS[" "] field_type WS[" "] field_name WS[" "] EQUALS WS[" "] field_offset ITEM_TERMINATOR WS["\n"] ) )
     {
         defineField(ctx, $field::fieldType,$field::fieldName,$field::defaultValue,$field::fieldOffset,$REPEATED==NULL,$REQUIRED!=NULL,0);
         stringFree($field::fieldName);
@@ -294,13 +297,25 @@ field_name
     ;
 
 field_type
-    : type
+    : numeric_type
     {
-        $field::fieldType=stringDup($type.text);
+        $field::isNumericType=1;
+        $field::fieldType=stringDup($numeric_type.text);
     }
-    | advanced_type
+    | array_type
     {
-       $field::fieldType=stringDup($advanced_type.text);
+        $field::isNumericType=0;
+        $field::fieldType=stringDup($array_type.text);
+    }
+    | advanced_numeric_type
+    {
+       $field::isNumericType=1;
+       $field::fieldType=stringDup($advanced_numeric_type.text);
+    }
+    | advanced_array_type
+    {
+       $field::isNumericType=0;
+       $field::fieldType=stringDup($advanced_array_type.text);
     }
     | ( IDENTIFIER 
         -> {SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL
@@ -314,6 +329,8 @@ field_type
              UINT64["uint64"] 
         -> IDENTIFIER )
     {
+       $field::isNumericType=(SCOPE_TOP(Symbols)->flag_sizes->get(SCOPE_TOP(Symbols)->flag_sizes,$IDENTIFIER.text->chars)!=NULL||
+                                SCOPE_TOP(Symbols)->enum_sizes->get(SCOPE_TOP(Symbols)->enum_sizes,$IDENTIFIER.text->chars)!=NULL);
        $field::fieldType=stringDup($IDENTIFIER.text);
     }
     ;
@@ -336,7 +353,7 @@ default_value
     }
 	;
 
-type:		UINT32
+numeric_type:		UINT32
 	|	INT32
 	|	SINT32
 	|	FIXED32
@@ -348,11 +365,12 @@ type:		UINT32
 	|	SFIXED64
 	|	FLOAT
 	|	DOUBLE
-	|	STRING
-	|	BYTES
 	|	BOOL
-
 	;
+array_type:	STRING
+	|	BYTES
+	;
+
 multiplicitive_advanced_type:
     |   NORMAL -> FLOAT["float"]
     |   VECTOR2F -> FLOAT["float"]
@@ -368,7 +386,7 @@ multiplicitive_advanced_type:
     |   BOUNDINGBOX3D3F -> DOUBLE["double"]
     ;
 
-advanced_type:	UINT8 -> UINT32["uint32"]
+advanced_numeric_type:	UINT8 -> UINT32["uint32"]
 	|	INT8 -> INT32["int32"]
 	|	SINT8 -> SINT32["sint32"]
 	|	FIXED8 -> INT32["uint32"]
@@ -378,11 +396,13 @@ advanced_type:	UINT8 -> UINT32["uint32"]
 	|	FIXED16 -> INT32["uint32"]
 	|	SFIXED16 -> INT32["sint32"]
     |   UINT16 -> UINT32["uint32"]
-    |   UUID -> BYTES["bytes"]
-    |   SHA256 -> BYTES["bytes"]
     |   ANGLE -> FLOAT["float"]
     |   TIME -> FIXED64["fixed64"]
     |   DURATION -> SFIXED64["sfixed64"]
+    ; 
+
+advanced_array_type:	   UUID -> BYTES["bytes"]
+    |   SHA256 -> BYTES["bytes"]
     ; 
 
 literal_value

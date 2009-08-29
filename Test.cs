@@ -9,6 +9,7 @@ class Test {
         Sirikata.PB.TestMessage.Builder tm=Sirikata.PB.TestMessage.CreateBuilder();
         tm.Xxfr=1.25f;
         tm.V3F=new PBJ.Vector3f(1,2,3);
+        tm.Extmesser= new Sirikata.PB.ExternalMessage();
         Sirikata.PB.TestMessage xti=tm.BuildPartial();
         byte[] s=xti.ToByteArray();
         System.Console.Write(s.Length);
