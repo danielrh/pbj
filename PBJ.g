@@ -87,7 +87,7 @@ protoroot
     @init {
         initNameSpace(ctx,SCOPE_TOP(NameSpace));
     }
-	:	importrule* package importrule* message*
+	:	(pbj_header|error_header) importrule* package importrule* message*
     {
     }
 	|	(importrule* message* -> PACKAGELITERAL["package"] WS[" "] QUALIFIEDIDENTIFIER[SCOPE_TOP(NameSpace)->externalNamespace->chars] STRING_LITERAL[SCOPE_TOP(NameSpace)->internalNamespace->chars] ITEM_TERMINATOR[";"] WS["\n"] importrule* message*)
@@ -95,6 +95,24 @@ protoroot
         definePackage( ctx, NULL );
     }
 	;
+
+error_header : ((DOT?)->WS["\n"])
+        {
+                fprintf(stderr,"error: line 0: please put \"pbj-0.0.3\" at the top of your PBJ file\n");
+                exit(1);
+        };
+pbj_header : (STRING_LITERAL -> WS["\n"])
+    {
+            if (strncmp((char*)$STRING_LITERAL.text->chars,"\"pbj-0.0.3\"",9)==0&&$STRING_LITERAL.text->chars[9]<='9'&&$STRING_LITERAL.text->chars[9]>='3') {
+                
+            }else {
+
+                fprintf(stderr,"error: line \%d: pbj version \%s not understood--this compiler understands \"pbj-0.0.3\"\n",$STRING_LITERAL->line,$STRING_LITERAL.text->chars);  
+                exit(1);
+            }
+    }
+    ;
+
 
 package
    :   ( PACKAGELITERAL QUALIFIEDIDENTIFIER ITEM_TERMINATOR -> PACKAGELITERAL WS[" "] QUALIFIEDIDENTIFIER QUALIFIEDIDENTIFIER["."] QUALIFIEDIDENTIFIER[SCOPE_TOP(NameSpace)->externalNamespace->chars] QUALIFIEDIDENTIFIER[SCOPE_TOP(NameSpace)->internalNamespace->chars] ITEM_TERMINATOR WS["\n"])
