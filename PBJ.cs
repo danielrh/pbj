@@ -1373,6 +1373,9 @@ public static bool ValidateSha256(Google.ProtocolBuffers.ByteString input) {
 public static bool ValidateAngle(float input) {
     return input>=0&&input<=3.1415926536*2.0;
 }
+public static bool ValidateSolidAngle(float input) {
+    return input>=0&&input<=3.1415926536*4.0;
+}
     public static bool ValidateTime(ulong input) {
         return true;
     }
@@ -1592,6 +1595,13 @@ public static float CastAngle(float d) {
     return d;
 }
 public static float CastAngle() {
+    return 0;
+}
+
+public static float CastSolidAngle(float d) {
+    return d;
+}
+public static float CastSolidAngle() {
     return 0;
 }
 

@@ -415,6 +415,7 @@ advanced_numeric_type:	UINT8 -> UINT32["uint32"]
 	|	SFIXED16 -> INT32["sint32"]
     |   UINT16 -> UINT32["uint32"]
     |   ANGLE -> FLOAT["float"]
+    |   SOLIDANGLE -> FLOAT["float"]
     |   TIME -> FIXED64["fixed64"]
     |   DURATION -> SFIXED64["sfixed64"]
     ; 
@@ -521,6 +522,7 @@ STRING   :   'string';
 UUID : 'uuid';
 SHA256 : 'sha256';
 ANGLE : 'angle';
+SOLIDANGLE : 'solidangle';
 TIME : 'time';
 DURATION : 'duration';
 NORMAL : 'normal';

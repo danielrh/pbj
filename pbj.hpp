@@ -39,6 +39,7 @@
 #include "util/Vector2.hpp"
 #include "util/Time.hpp"
 #include "util/Sha256.hpp"
+#include "util/SolidAngle.hpp"
 
 #include <google/protobuf/message.h>
 #include <cmath>
@@ -270,7 +271,7 @@ public:
     int GetCachedSize() const {
         return _mMessage->GetCachedSize();
     }
-    
+
 };
 
 template <class T> class RefClass : public T{
@@ -304,6 +305,7 @@ typedef Sirikata::BoundingBox3f3f BoundingBox3f3f;
 typedef Sirikata::BoundingBox3d3f BoundingBox3d3f;
 typedef Sirikata::BoundingSphere3f BoundingSphere3f;
 typedef Sirikata::BoundingSphere3d BoundingSphere3d;
+typedef Sirikata::SolidAngle SolidAngle;
 
 typedef Sirikata::Array<float,2> Array2f;
 typedef Sirikata::Array<double,2> Array2d;
@@ -316,17 +318,7 @@ typedef Sirikata::Array<double,6> Array6d;
 
 class angle {};
 class normal :public Vector3f{public:normal(const Vector3f&v):Vector3f(v){}};
-class vector2f {};
-class vector3f {};
-class vector4f {};
-class vector2d {};
-class vector3d {};
-class vector4d {};
 class quaternion{};
-class boundingsphere3f{};
-class boundingsphere3d{};
-class boundingbox3d3f{};
-class boundingbox3dff{};
 class utf8string:public ::std::string{public:utf8string(const std::string&s):std::string(s){}};
 class bytes:public ::std::string{public:bytes(const std::string&s):std::string(s){}};
 }
@@ -343,6 +335,12 @@ template <> class _PBJConstruct<PBJ::angle> {
 public:
     float operator()(const float &ang) {
         return ang;
+    }
+};
+template <> class _PBJConstruct<PBJ::SolidAngle> {
+public:
+    float operator()(const PBJ::SolidAngle &ang) {
+        return ang.asFloat();
     }
 };
 template <> class _PBJConstruct<PBJ::Time> {
@@ -466,7 +464,7 @@ public:
     typedef PBJ::Array3f ArrayType;
     PBJ::Array3f operator()(const PBJ::Quaternion&q) {
         PBJ::Quaternion ct=q/q.length();
-        
+
         float data[3]={ct.x+(ct.w<0.0f?3.0f:0.0f),ct.y,ct.z};
         return PBJ::Array3f::construct(data);
     }
@@ -607,6 +605,18 @@ public:
     }
     float operator()() {
         return 0;
+    }
+};
+template <> class _PBJCast<PBJ::SolidAngle> {
+public:
+    PBJ::SolidAngle operator()(const float ang) {
+        if (!_PBJIsFinite(ang)) {
+            return operator()();
+        }
+        return PBJ::SolidAngle(ang);
+    }
+    PBJ::SolidAngle operator()() {
+        return PBJ::SolidAngle(0.f);
     }
 };
 template <> class _PBJCast<PBJ::Time> {
@@ -786,6 +796,12 @@ template <> class _PBJValidate<PBJ::angle> {
 public:
     bool operator()(const float&ct) {
         return ct>=0&&ct<=2*3.1415926536;
+    }
+};
+template <> class _PBJValidate<PBJ::SolidAngle> {
+public:
+    bool operator()(const float&ct) {
+        return ct>=0&&ct<=4*3.1415926536;
     }
 };
 template <typename Type> class _PBJValidateFlags {
