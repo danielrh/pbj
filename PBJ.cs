@@ -1346,6 +1346,18 @@ public static bool ValidateUint16(ushort d) {
 public static bool ValidateUint8(byte d) {
     return true;
 }
+public static bool ValidateSint64(long d) {
+    return true;
+}
+public static bool ValidateSint32(int d) {
+    return true;
+}
+public static bool ValidateSint16(short d) {
+    return true;
+}
+public static bool ValidateSint8(sbyte d) {
+    return true;
+}
 public static bool ValidateInt64(long d) {
     return true;
 }
@@ -1407,6 +1419,18 @@ public static ushort CastUint16(ushort d) {
 public static byte CastUint8(byte d) {
     return d;
 }
+public static long CastSint64(long d) {
+    return d;
+}
+public static int CastSint32(int d) {
+    return d;
+}
+public static short CastSint16(short d) {
+    return d;
+}
+public static sbyte CastSint8(sbyte d) {
+    return d;
+}
 public static long CastInt64(long d) {
     return d;
 }
@@ -1447,6 +1471,18 @@ public static ushort CastUint16() {
     return 0;
 }
 public static byte CastUint8() {
+    return 0;
+}
+public static long CastSint64() {
+    return 0;
+}
+public static int CastSint32() {
+    return 0;
+}
+public static short CastSint16() {
+    return 0;
+}
+public static sbyte CastSint8() {
     return 0;
 }
 public static long CastInt64() {
