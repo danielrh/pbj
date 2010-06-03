@@ -32,14 +32,11 @@
 
 #ifndef _PBJ_PBJ_HPP_
 #define _PBJ_PBJ_HPP_
-#include "util/Platform.hpp"
-#include "util/UUID.hpp"
-#include "util/BoundingSphere.hpp"
-#include "util/BoundingBox.hpp"
-#include "util/Vector2.hpp"
-#include "util/Time.hpp"
-#include "util/Sha256.hpp"
-#include "util/SolidAngle.hpp"
+
+// NOTE: You should have a ProjectPBJ.hpp in your include path.  This defines
+// the types you want PBJ to use for the project.
+// FIXME currently we're still using things directly from the Sirikata namespace.
+#include "sirikata/core/ProjectPBJ.hpp"
 
 #include <google/protobuf/message.h>
 #include <cmath>
